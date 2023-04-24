@@ -1,6 +1,11 @@
-import test from 'ava';
-import { createFromIdls } from '../src';
+import { createFromIdls, isRootNode } from '../src';
+import { phoenixIdl } from './phoenix';
 
-test('example test', async (t) => {
-  t.is(typeof createFromIdls, 'function');
-});
+
+describe("Test Kinobi Root Node creation", () => {
+  test("Creating root node", async () => {
+  const kinobi = createFromIdls([phoenixIdl])
+  const rootNode = kinobi.getRoot();
+  expect(isRootNode(rootNode)).toBeTruthy()
+  })
+})
