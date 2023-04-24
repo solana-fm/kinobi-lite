@@ -1,24 +1,25 @@
 {
-  "name": "@metaplex-foundation/kinobi",
+  "name": "@solanafm/kinobi-lite",
   "version": "0.7.0",
-  "description": "Generate powerful clients for your Solana programs",
-  "main": "dist/cjs/index.js",
-  "types": "dist/types/index.d.ts",
+  "description": "A lite client of Kinobi by Metaplex Foundations that's suitable for web deployments",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "files": [
-    "/dist/cjs",
-    "/dist/types",
-    "/src"
+    "/dist"
   ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
   "scripts": {
-    "build": "rimraf dist && tsc && tsc -p test/tsconfig.json && pnpm build:njk",
-    "build:njk": "copyfiles -u 1 src/**/*.njk dist/cjs/ && copyfiles -u 1 src/**/*.njk dist/test/src/",
-    "build:docs": "typedoc",
-    "test": "ava && node ./test/testFile.cjs",
+    "build": "tsup src/index.ts --format esm,cjs --dts --minify",
+    "dev": "tsup src/index.ts --format esm,cjs --watch --dts",
+    "clean": "rm -rf node_modules && rm -rf dist",
     "lint": "prettier -c ./src/ && eslint . --ext .js,.jsx,.ts,.tsx",
-    "lint:fix": "prettier --write ./src && eslint . --ext .js,.jsx,.ts,.tsx",
-    "package:change": "changeset",
-    "package:version": "changeset version",
-    "package:publish": "pnpm lint && pnpm build && changeset publish"
+    "lint:fix": "prettier --write ./src && eslint . --ext .js,.jsx,.ts,.tsx"
   },
   "publishConfig": {
     "access": "public"
@@ -29,51 +30,29 @@
     "framework",
     "generator"
   ],
-  "author": "Metaplex Maintainers <contact@metaplex.com>",
+  "author": "SolanaFM <contact@solana.fm>",
   "license": "MIT",
   "repository": {
-    "url": "https://github.com/metaplex-foundation/kinobi.git"
+    "url": "https://github.com/solana-fm/kinobi-lite.git"
   },
   "devDependencies": {
-    "@ava/typescript": "^3.0.1",
     "@changesets/changelog-github": "^0.4.8",
     "@changesets/cli": "^2.26.0",
     "@types/node": "^18.11.17",
-    "@types/nunjucks": "^3.2.1",
     "@types/prettier": "^2.7.1",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.46.1",
-    "ava": "^5.1.0",
-    "copyfiles": "^2.4.1",
     "eslint": "^8.0.1",
     "eslint-config-airbnb-typescript": "^17.0.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-prettier": "^4.2.1",
-    "rimraf": "^3.0.2",
-    "typedoc": "^0.23.25",
-    "typedoc-plugin-missing-exports": "^1.0.0",
-    "typescript": "^4.9.4",
-    "vercel": "^28.16.2"
+    "prettier": "^2.8.1",
+    "tsup": "^6.7.0",
+    "typescript": "^4.9.4"
   },
   "dependencies": {
-    "@noble/hashes": "^1.1.5",
-    "chalk": "^4.0.0",
-    "nunjucks": "^3.2.3",
-    "prettier": "^2.8.1"
-  },
-  "ava": {
-    "files": [
-      "!test/package",
-      "test/**/*.test.ts"
-    ],
-    "typescript": {
-      "compile": false,
-      "rewritePaths": {
-        "src/": "dist/test/src/",
-        "test/": "dist/test/test/"
-      }
-    }
+    "@noble/hashes": "^1.1.5"
   },
   "packageManager": "pnpm@7.18.1"
 }
