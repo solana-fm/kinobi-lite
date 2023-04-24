@@ -1,5 +1,4 @@
 import type { Idl } from '../idl';
-import { readJson } from '../shared';
 import type { AccountNode } from './AccountNode';
 import type { DefinedTypeNode } from './DefinedTypeNode';
 import type { ErrorNode } from './ErrorNode';
@@ -22,8 +21,7 @@ export function rootNode(programs: ProgramNode[]): RootNode {
 export function rootNodeFromIdls(idls: IdlInputs): RootNode {
   const idlArray = Array.isArray(idls) ? idls : [idls];
   const programs = idlArray
-    .map((idl) => (typeof idl === 'string' ? readJson<Partial<Idl>>(idl) : idl))
-    .map((idl) => programNodeFromIdl(idl));
+    .map((idl) => programNodeFromIdl(idl as Partial<Idl>));
   return rootNode(programs);
 }
 
