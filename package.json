@@ -1,7 +1,7 @@
 {
   "name": "@solanafm/kinobi-lite",
   "version": "0.7.0",
-  "description": "A lite client of Kinobi by Metaplex Foundations that's suitable for web deployments",
+  "description": "A lite client of Kinobi by Metaplex Foundations that's suitable for web deployment and omits the renderers",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -11,7 +11,7 @@
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "require": "./dist/index.js"
     }
   },
   "scripts": {
