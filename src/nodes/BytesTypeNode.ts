@@ -1,7 +1,7 @@
 import {
   SizeStrategy,
   displaySizeStrategy,
-  remainderSize,
+  prefixedSize,
 } from '../shared/SizeStrategy';
 import type { Node } from './Node';
 
@@ -14,7 +14,8 @@ export type BytesTypeNode = {
 export function bytesTypeNode(size?: SizeStrategy): BytesTypeNode {
   return {
     kind: 'bytesTypeNode',
-    size: size ?? remainderSize(),
+    // size: size ?? remainderSize()
+    size: size ?? prefixedSize(),
   } as BytesTypeNode;
 }
 
