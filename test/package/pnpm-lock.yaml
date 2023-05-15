@@ -1,0 +1,23 @@
+lockfileVersion: '6.0'
+
+dependencies:
+  '@metaplex-foundation/umi':
+    specifier: ^0.7.4
+    version: 0.7.4
+
+devDependencies:
+  typescript:
+    specifier: ^4.9.4
+    version: 4.9.4
+
+packages:
+
+  /@metaplex-foundation/umi@0.7.4:
+    resolution: {integrity: sha512-A6IgqD9LdDmDHhtKEZ1/riJUNqljoz9IkDG1GtWUAvcN7POY1tjsTyDWYyvyQrVCHucV+0z9HUDUQ9WLV0AG8g==}
+    dev: false
+
+  /typescript@4.9.4:
+    resolution: {integrity: sha512-Uz+dTXYzxXXbsFpM86Wh3dKCxrQqUcVMxwU54orwlJjOpO3ao8L7j5lH+dWfTwgCwIuM9GQ2kvVotzYJMXTBZg==}
+    engines: {node: '>=4.2.0'}
+    hasBin: true
+    dev: true
