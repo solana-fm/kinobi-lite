@@ -19,7 +19,7 @@ kinobi.update(
     Metadata: { size: 679 },
     MasterEditionV1: {
       seeds: [
-        k.literalSeed('metadata'),
+        k.stringConstantSeed('metadata'),
         k.programSeed(),
         k.variableSeed(
           'delegateRole',
@@ -31,16 +31,16 @@ kinobi.update(
     MasterEditionV2: {
       size: 282,
       seeds: [
-        k.literalSeed('metadata'),
+        k.stringConstantSeed('metadata'),
         k.programSeed(),
         k.publicKeySeed('mint', 'The address of the mint account'),
-        k.literalSeed('edition'),
+        k.stringConstantSeed('edition'),
       ],
     },
     delegateRecord: {
       size: 282,
       seeds: [
-        k.literalSeed('delegate_record'),
+        k.stringConstantSeed('delegate_record'),
         k.programSeed(),
         k.variableSeed(
           'role',
@@ -106,6 +106,12 @@ kinobi.update(
               role: k.valueDefault(k.vEnum('delegateRole', 'Collection')),
             },
           }),
+        },
+      },
+      args: {
+        identityArg: {
+          type: k.publicKeyTypeNode(),
+          defaultsTo: k.identityDefault(),
         },
       },
     },

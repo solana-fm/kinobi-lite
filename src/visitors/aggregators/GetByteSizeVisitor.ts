@@ -63,10 +63,11 @@ export class GetByteSizeVisitor extends BaseThrowVisitor<number | null> {
     if (linkType.size !== undefined) return linkType.size;
     if (linkType.importFrom !== 'generated') return null;
 
+    // Fetch the linked type and return null if not found.
+    // The validator visitor will throw a proper error later on.
     const linkedDefinedType = this.availableDefinedTypes.get(linkType.name);
-
     if (!linkedDefinedType) {
-      throw new Error(`Cannot find linked defined type ${linkType.name}.`);
+      return null;
     }
 
     // This prevents infinite recursion by using assuming
@@ -79,7 +80,8 @@ export class GetByteSizeVisitor extends BaseThrowVisitor<number | null> {
   }
 
   visitEnumType(enumType: nodes.EnumTypeNode): number | null {
-    if (nodes.isScalarEnum(enumType)) return 1;
+    const prefix = visit(enumType.size, this) ?? 1;
+    if (nodes.isScalarEnum(enumType)) return prefix;
     const variantSizes = enumType.variants.map((v) => visit(v, this));
     const allVariantHaveTheSameFixedSize = variantSizes.every(
       (one, i, all) => one === all[0]
@@ -87,7 +89,7 @@ export class GetByteSizeVisitor extends BaseThrowVisitor<number | null> {
     return allVariantHaveTheSameFixedSize &&
       variantSizes.length > 0 &&
       variantSizes[0] !== null
-      ? variantSizes[0] + 1
+      ? variantSizes[0] + prefix
       : null;
   }
 

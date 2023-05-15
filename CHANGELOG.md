@@ -1,5 +1,51 @@
 # @metaplex-foundation/kinobi
 
+## 0.8.3
+
+### Patch Changes
+
+- [`8b1d051`](https://github.com/metaplex-foundation/kinobi/commit/8b1d051bb304186c41097ce3601da4bf002138e4) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Fix recursive type imports
+
+## 0.8.2
+
+### Patch Changes
+
+- [`69f2425`](https://github.com/metaplex-foundation/kinobi/commit/69f2425c62ddef5233c7febb90d235a2cb57f2c0) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Fix byte size calculation for custom sized enums
+
+- [`07ffd93`](https://github.com/metaplex-foundation/kinobi/commit/07ffd93d1f39df6eda4249fb21d1c5743f1f1065) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Convert account to public key when used as an arg default
+
+## 0.8.1
+
+### Patch Changes
+
+- [#36](https://github.com/metaplex-foundation/kinobi/pull/36) [`1f34c3a`](https://github.com/metaplex-foundation/kinobi/commit/1f34c3a218d034340e236f1a712d7c724ebc0435) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Support custom discriminator sizes for enums
+
+- [`ff685c7`](https://github.com/metaplex-foundation/kinobi/commit/ff685c76bce46c838970af623ce6fcfd1707808b) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Don't throw too early in the GetByteSizeVisitor
+
+## 0.8.0
+
+### Minor Changes
+
+- [`63f13ca`](https://github.com/metaplex-foundation/kinobi/commit/63f13caa1f11e7e120eed36e3be536e1c475467e) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Add renderParentInstructions option to JS renderer
+
+- [`0105e0f`](https://github.com/metaplex-foundation/kinobi/commit/0105e0f28b8b2e1972945ba1d69a83f8e7e7b7db) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Broaden the literal seed type as a constant seed type
+
+### Patch Changes
+
+- [`2754272`](https://github.com/metaplex-foundation/kinobi/commit/2754272b81497443a8b8eee759763d48cd175dd0) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Fix intermediary type when mapping serializers
+
+- [`15a869d`](https://github.com/metaplex-foundation/kinobi/commit/15a869dc9c51be0f7b81f8ee81207f46c131e57d) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Export fetchMyAccountFromSeeds helper functions
+
+- [`fc7d12b`](https://github.com/metaplex-foundation/kinobi/commit/fc7d12be558828ee983aba78bf4b72fea14d390e) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Fix exported comment when error has no message
+
+- [`d74770c`](https://github.com/metaplex-foundation/kinobi/commit/d74770c629094ff04dcb9280a369d2fad7452240) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Rely on the name of dataArgs and extraArgs when rendering JS code
+
+## 0.7.3
+
+### Patch Changes
+
+- [`8466e9c`](https://github.com/metaplex-foundation/kinobi/commit/8466e9c0b35d2e0e4cc4298da64c9493a976543d) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Offer more default kinds for args
+
 ## 0.7.2
 
 ### Patch Changes
