@@ -1,5 +1,17 @@
 # @metaplex-foundation/kinobi
 
+## 0.8.5
+
+### Patch Changes
+
+- [`b94d32e`](https://github.com/metaplex-foundation/kinobi/commit/b94d32e90c27f1ecb9fbe7d117651d9fa7ff22f6) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Fix computation of Anchor account discriminators
+
+## 0.8.4
+
+### Patch Changes
+
+- [#41](https://github.com/metaplex-foundation/kinobi/pull/41) [`c01c113`](https://github.com/metaplex-foundation/kinobi/commit/c01c113304377b7b1f3642a383aa718ce3b66c1a) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Fix account seeds with no variable seeds
+
 ## 0.8.3
 
 ### Patch Changes
