@@ -9,25 +9,30 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 
 // Accounts.
 export type SetTokenStandardInstructionAccounts = {
   /** Metadata account */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Metadata update authority */
   updateAuthority: Signer;
   /** Mint account */
-  mint: PublicKey;
+  mint: PublicKey | Pda;
   /** Edition account */
-  edition?: PublicKey;
+  edition?: PublicKey | Pda;
 };
 
 // Data.
@@ -35,19 +40,29 @@ export type SetTokenStandardInstructionData = { discriminator: number };
 
 export type SetTokenStandardInstructionDataArgs = {};
 
+/** @deprecated Use `getSetTokenStandardInstructionDataSerializer()` without any argument instead. */
 export function getSetTokenStandardInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  SetTokenStandardInstructionDataArgs,
+  SetTokenStandardInstructionData
+>;
+export function getSetTokenStandardInstructionDataSerializer(): Serializer<
+  SetTokenStandardInstructionDataArgs,
+  SetTokenStandardInstructionData
+>;
+export function getSetTokenStandardInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   SetTokenStandardInstructionDataArgs,
   SetTokenStandardInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     SetTokenStandardInstructionDataArgs,
     any,
     SetTokenStandardInstructionData
   >(
-    s.struct<SetTokenStandardInstructionData>([['discriminator', s.u8()]], {
+    struct<SetTokenStandardInstructionData>([['discriminator', u8()]], {
       description: 'SetTokenStandardInstructionData',
     }),
     (value) => ({ ...value, discriminator: 35 })
@@ -59,60 +74,33 @@ export function getSetTokenStandardInstructionDataSerializer(
 
 // Instruction.
 export function setTokenStandard(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: SetTokenStandardInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
+  const resolvedAccounts = {
+    metadata: [input.metadata, true] as const,
+    updateAuthority: [input.updateAuthority, true] as const,
+    mint: [input.mint, false] as const,
+    edition: [input.edition, false] as const,
+  };
 
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Update Authority.
-  signers.push(resolvedAccounts.updateAuthority);
-  keys.push({
-    pubkey: resolvedAccounts.updateAuthority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.updateAuthority, true),
-  });
-
-  // Mint.
-  keys.push({
-    pubkey: resolvedAccounts.mint,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.mint, false),
-  });
-
-  // Edition (optional).
-  if (resolvedAccounts.edition) {
-    keys.push({
-      pubkey: resolvedAccounts.edition,
-      isSigner: false,
-      isWritable: isWritable(resolvedAccounts.edition, false),
-    });
-  }
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.updateAuthority, false);
+  addAccountMeta(keys, signers, resolvedAccounts.mint, false);
+  addAccountMeta(keys, signers, resolvedAccounts.edition, true);
 
   // Data.
-  const data = getSetTokenStandardInstructionDataSerializer(context).serialize(
-    {}
-  );
+  const data = getSetTokenStandardInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

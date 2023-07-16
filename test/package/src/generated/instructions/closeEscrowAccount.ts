@@ -9,34 +9,39 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   publicKey,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 
 // Accounts.
 export type CloseEscrowAccountInstructionAccounts = {
   /** Escrow account */
-  escrow: PublicKey;
+  escrow: PublicKey | Pda;
   /** Metadata account */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Mint account */
-  mint: PublicKey;
+  mint: PublicKey | Pda;
   /** Token account */
-  tokenAccount: PublicKey;
+  tokenAccount: PublicKey | Pda;
   /** Edition account */
-  edition: PublicKey;
+  edition: PublicKey | Pda;
   /** Wallet paying for the transaction and new account */
   payer?: Signer;
   /** System program */
-  systemProgram?: PublicKey;
+  systemProgram?: PublicKey | Pda;
   /** Instructions sysvar account */
-  sysvarInstructions?: PublicKey;
+  sysvarInstructions?: PublicKey | Pda;
 };
 
 // Data.
@@ -44,19 +49,29 @@ export type CloseEscrowAccountInstructionData = { discriminator: number };
 
 export type CloseEscrowAccountInstructionDataArgs = {};
 
+/** @deprecated Use `getCloseEscrowAccountInstructionDataSerializer()` without any argument instead. */
 export function getCloseEscrowAccountInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  CloseEscrowAccountInstructionDataArgs,
+  CloseEscrowAccountInstructionData
+>;
+export function getCloseEscrowAccountInstructionDataSerializer(): Serializer<
+  CloseEscrowAccountInstructionDataArgs,
+  CloseEscrowAccountInstructionData
+>;
+export function getCloseEscrowAccountInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   CloseEscrowAccountInstructionDataArgs,
   CloseEscrowAccountInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     CloseEscrowAccountInstructionDataArgs,
     any,
     CloseEscrowAccountInstructionData
   >(
-    s.struct<CloseEscrowAccountInstructionData>([['discriminator', s.u8()]], {
+    struct<CloseEscrowAccountInstructionData>([['discriminator', u8()]], {
       description: 'CloseEscrowAccountInstructionData',
     }),
     (value) => ({ ...value, discriminator: 39 })
@@ -68,104 +83,68 @@ export function getCloseEscrowAccountInstructionDataSerializer(
 
 // Instruction.
 export function closeEscrowAccount(
-  context: Pick<Context, 'serializer' | 'programs' | 'payer'>,
+  context: Pick<Context, 'programs' | 'payer'>,
   input: CloseEscrowAccountInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
-  addObjectProperty(resolvingAccounts, 'payer', input.payer ?? context.payer);
+  const resolvedAccounts = {
+    escrow: [input.escrow, true] as const,
+    metadata: [input.metadata, true] as const,
+    mint: [input.mint, false] as const,
+    tokenAccount: [input.tokenAccount, false] as const,
+    edition: [input.edition, false] as const,
+  };
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
+    'payer',
+    input.payer
+      ? ([input.payer, true] as const)
+      : ([context.payer, true] as const)
+  );
+  addObjectProperty(
+    resolvedAccounts,
     'systemProgram',
-    input.systemProgram ?? {
-      ...context.programs.getPublicKey(
-        'splSystem',
-        '11111111111111111111111111111111'
-      ),
-      isWritable: false,
-    }
+    input.systemProgram
+      ? ([input.systemProgram, false] as const)
+      : ([
+          context.programs.getPublicKey(
+            'splSystem',
+            '11111111111111111111111111111111'
+          ),
+          false,
+        ] as const)
   );
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'sysvarInstructions',
-    input.sysvarInstructions ??
-      publicKey('Sysvar1nstructions1111111111111111111111111')
+    input.sysvarInstructions
+      ? ([input.sysvarInstructions, false] as const)
+      : ([
+          publicKey('Sysvar1nstructions1111111111111111111111111'),
+          false,
+        ] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
 
-  // Escrow.
-  keys.push({
-    pubkey: resolvedAccounts.escrow,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.escrow, true),
-  });
-
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Mint.
-  keys.push({
-    pubkey: resolvedAccounts.mint,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.mint, false),
-  });
-
-  // Token Account.
-  keys.push({
-    pubkey: resolvedAccounts.tokenAccount,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.tokenAccount, false),
-  });
-
-  // Edition.
-  keys.push({
-    pubkey: resolvedAccounts.edition,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.edition, false),
-  });
-
-  // Payer.
-  signers.push(resolvedAccounts.payer);
-  keys.push({
-    pubkey: resolvedAccounts.payer.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.payer, true),
-  });
-
-  // System Program.
-  keys.push({
-    pubkey: resolvedAccounts.systemProgram,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.systemProgram, false),
-  });
-
-  // Sysvar Instructions.
-  keys.push({
-    pubkey: resolvedAccounts.sysvarInstructions,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.sysvarInstructions, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.escrow, false);
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.mint, false);
+  addAccountMeta(keys, signers, resolvedAccounts.tokenAccount, false);
+  addAccountMeta(keys, signers, resolvedAccounts.edition, false);
+  addAccountMeta(keys, signers, resolvedAccounts.payer, false);
+  addAccountMeta(keys, signers, resolvedAccounts.systemProgram, false);
+  addAccountMeta(keys, signers, resolvedAccounts.sysvarInstructions, false);
 
   // Data.
-  const data = getCloseEscrowAccountInstructionDataSerializer(
-    context
-  ).serialize({});
+  const data = getCloseEscrowAccountInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

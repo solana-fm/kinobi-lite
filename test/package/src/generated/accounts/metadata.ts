@@ -10,17 +10,29 @@ import {
   Account,
   Context,
   Option,
+  OptionOrNullable,
   Pda,
   PublicKey,
   RpcAccount,
   RpcGetAccountOptions,
   RpcGetAccountsOptions,
-  Serializer,
   assertAccountExists,
   deserializeAccount,
   gpaBuilder,
-  mapSerializer,
+  publicKey as toPublicKey,
 } from '@metaplex-foundation/umi';
+import {
+  Serializer,
+  array,
+  bool,
+  mapSerializer,
+  option,
+  publicKey as publicKeySerializer,
+  string,
+  struct,
+  u16,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
 import {
   Collection,
   CollectionArgs,
@@ -77,48 +89,49 @@ export type MetadataAccountDataArgs = {
   symbol: string;
   uri: string;
   sellerFeeBasisPoints: number;
-  creators: Option<Array<CreatorArgs>>;
+  creators: OptionOrNullable<Array<CreatorArgs>>;
   primarySaleHappened: boolean;
   isMutable: boolean;
-  editionNonce: Option<number>;
-  tokenStandard: Option<TokenStandardArgs>;
-  collection: Option<CollectionArgs>;
-  uses: Option<UsesArgs>;
-  collectionDetails: Option<CollectionDetailsArgs>;
-  programmableConfig: Option<ProgrammableConfigArgs>;
-  delegateState: Option<DelegateStateArgs>;
+  editionNonce: OptionOrNullable<number>;
+  tokenStandard: OptionOrNullable<TokenStandardArgs>;
+  collection: OptionOrNullable<CollectionArgs>;
+  uses: OptionOrNullable<UsesArgs>;
+  collectionDetails: OptionOrNullable<CollectionDetailsArgs>;
+  programmableConfig: OptionOrNullable<ProgrammableConfigArgs>;
+  delegateState: OptionOrNullable<DelegateStateArgs>;
 };
 
+/** @deprecated Use `getMetadataAccountDataSerializer()` without any argument instead. */
 export function getMetadataAccountDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<MetadataAccountDataArgs, MetadataAccountData>;
+export function getMetadataAccountDataSerializer(): Serializer<
+  MetadataAccountDataArgs,
+  MetadataAccountData
+>;
+export function getMetadataAccountDataSerializer(
+  _context: object = {}
 ): Serializer<MetadataAccountDataArgs, MetadataAccountData> {
-  const s = context.serializer;
   return mapSerializer<MetadataAccountDataArgs, any, MetadataAccountData>(
-    s.struct<MetadataAccountData>(
+    struct<MetadataAccountData>(
       [
-        ['key', getTmKeySerializer(context)],
-        ['updateAuthority', s.publicKey()],
-        ['mint', s.publicKey()],
-        ['name', s.string()],
-        ['symbol', s.string()],
-        ['uri', s.string()],
-        ['sellerFeeBasisPoints', s.u16()],
-        ['creators', s.option(s.array(getCreatorSerializer(context)))],
-        ['primarySaleHappened', s.bool()],
-        ['isMutable', s.bool()],
-        ['editionNonce', s.option(s.u8())],
-        ['tokenStandard', s.option(getTokenStandardSerializer(context))],
-        ['collection', s.option(getCollectionSerializer(context))],
-        ['uses', s.option(getUsesSerializer(context))],
-        [
-          'collectionDetails',
-          s.option(getCollectionDetailsSerializer(context)),
-        ],
-        [
-          'programmableConfig',
-          s.option(getProgrammableConfigSerializer(context)),
-        ],
-        ['delegateState', s.option(getDelegateStateSerializer(context))],
+        ['key', getTmKeySerializer()],
+        ['updateAuthority', publicKeySerializer()],
+        ['mint', publicKeySerializer()],
+        ['name', string()],
+        ['symbol', string()],
+        ['uri', string()],
+        ['sellerFeeBasisPoints', u16()],
+        ['creators', option(array(getCreatorSerializer()))],
+        ['primarySaleHappened', bool()],
+        ['isMutable', bool()],
+        ['editionNonce', option(u8())],
+        ['tokenStandard', option(getTokenStandardSerializer())],
+        ['collection', option(getCollectionSerializer())],
+        ['uses', option(getUsesSerializer())],
+        ['collectionDetails', option(getCollectionDetailsSerializer())],
+        ['programmableConfig', option(getProgrammableConfigSerializer())],
+        ['delegateState', option(getDelegateStateSerializer())],
       ],
       { description: 'MetadataAccountData' }
     ),
@@ -126,66 +139,79 @@ export function getMetadataAccountDataSerializer(
   ) as Serializer<MetadataAccountDataArgs, MetadataAccountData>;
 }
 
+/** @deprecated Use `deserializeMetadata(rawAccount)` without any context instead. */
 export function deserializeMetadata(
-  context: Pick<Context, 'serializer'>,
+  context: object,
   rawAccount: RpcAccount
+): Metadata;
+export function deserializeMetadata(rawAccount: RpcAccount): Metadata;
+export function deserializeMetadata(
+  context: RpcAccount | object,
+  rawAccount?: RpcAccount
 ): Metadata {
   return deserializeAccount(
-    rawAccount,
-    getMetadataAccountDataSerializer(context)
+    rawAccount ?? (context as RpcAccount),
+    getMetadataAccountDataSerializer()
   );
 }
 
 export async function fetchMetadata(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<Metadata> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
   assertAccountExists(maybeAccount, 'Metadata');
-  return deserializeMetadata(context, maybeAccount);
+  return deserializeMetadata(maybeAccount);
 }
 
 export async function safeFetchMetadata(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<Metadata | null> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
-  return maybeAccount.exists
-    ? deserializeMetadata(context, maybeAccount)
-    : null;
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
+  return maybeAccount.exists ? deserializeMetadata(maybeAccount) : null;
 }
 
 export async function fetchAllMetadata(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<Metadata[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts.map((maybeAccount) => {
     assertAccountExists(maybeAccount, 'Metadata');
-    return deserializeMetadata(context, maybeAccount);
+    return deserializeMetadata(maybeAccount);
   });
 }
 
 export async function safeFetchAllMetadata(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<Metadata[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts
     .filter((maybeAccount) => maybeAccount.exists)
-    .map((maybeAccount) =>
-      deserializeMetadata(context, maybeAccount as RpcAccount)
-    );
+    .map((maybeAccount) => deserializeMetadata(maybeAccount as RpcAccount));
 }
 
 export function getMetadataGpaBuilder(
-  context: Pick<Context, 'rpc' | 'serializer' | 'programs'>
+  context: Pick<Context, 'rpc' | 'programs'>
 ) {
-  const s = context.serializer;
   const programId = context.programs.getPublicKey(
     'mplTokenMetadata',
     'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
@@ -199,44 +225,36 @@ export function getMetadataGpaBuilder(
       symbol: string;
       uri: string;
       sellerFeeBasisPoints: number;
-      creators: Option<Array<CreatorArgs>>;
+      creators: OptionOrNullable<Array<CreatorArgs>>;
       primarySaleHappened: boolean;
       isMutable: boolean;
-      editionNonce: Option<number>;
-      tokenStandard: Option<TokenStandardArgs>;
-      collection: Option<CollectionArgs>;
-      uses: Option<UsesArgs>;
-      collectionDetails: Option<CollectionDetailsArgs>;
-      programmableConfig: Option<ProgrammableConfigArgs>;
-      delegateState: Option<DelegateStateArgs>;
+      editionNonce: OptionOrNullable<number>;
+      tokenStandard: OptionOrNullable<TokenStandardArgs>;
+      collection: OptionOrNullable<CollectionArgs>;
+      uses: OptionOrNullable<UsesArgs>;
+      collectionDetails: OptionOrNullable<CollectionDetailsArgs>;
+      programmableConfig: OptionOrNullable<ProgrammableConfigArgs>;
+      delegateState: OptionOrNullable<DelegateStateArgs>;
     }>({
-      key: [0, getTmKeySerializer(context)],
-      updateAuthority: [1, s.publicKey()],
-      mint: [33, s.publicKey()],
-      name: [65, s.string()],
-      symbol: [null, s.string()],
-      uri: [null, s.string()],
-      sellerFeeBasisPoints: [null, s.u16()],
-      creators: [null, s.option(s.array(getCreatorSerializer(context)))],
-      primarySaleHappened: [null, s.bool()],
-      isMutable: [null, s.bool()],
-      editionNonce: [null, s.option(s.u8())],
-      tokenStandard: [null, s.option(getTokenStandardSerializer(context))],
-      collection: [null, s.option(getCollectionSerializer(context))],
-      uses: [null, s.option(getUsesSerializer(context))],
-      collectionDetails: [
-        null,
-        s.option(getCollectionDetailsSerializer(context)),
-      ],
-      programmableConfig: [
-        null,
-        s.option(getProgrammableConfigSerializer(context)),
-      ],
-      delegateState: [null, s.option(getDelegateStateSerializer(context))],
+      key: [0, getTmKeySerializer()],
+      updateAuthority: [1, publicKeySerializer()],
+      mint: [33, publicKeySerializer()],
+      name: [65, string()],
+      symbol: [null, string()],
+      uri: [null, string()],
+      sellerFeeBasisPoints: [null, u16()],
+      creators: [null, option(array(getCreatorSerializer()))],
+      primarySaleHappened: [null, bool()],
+      isMutable: [null, bool()],
+      editionNonce: [null, option(u8())],
+      tokenStandard: [null, option(getTokenStandardSerializer())],
+      collection: [null, option(getCollectionSerializer())],
+      uses: [null, option(getUsesSerializer())],
+      collectionDetails: [null, option(getCollectionDetailsSerializer())],
+      programmableConfig: [null, option(getProgrammableConfigSerializer())],
+      delegateState: [null, option(getDelegateStateSerializer())],
     })
-    .deserializeUsing<Metadata>((account) =>
-      deserializeMetadata(context, account)
-    )
+    .deserializeUsing<Metadata>((account) => deserializeMetadata(account))
     .whereField('key', TmKey.MetadataV1);
 }
 
@@ -245,26 +263,25 @@ export function getMetadataSize(): number {
 }
 
 export function findMetadataPda(
-  context: Pick<Context, 'eddsa' | 'programs' | 'serializer'>,
+  context: Pick<Context, 'eddsa' | 'programs'>,
   seeds: {
     /** The address of the mint account */
     mint: PublicKey;
   }
 ): Pda {
-  const s = context.serializer;
   const programId = context.programs.getPublicKey(
     'mplTokenMetadata',
     'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
   );
   return context.eddsa.findPda(programId, [
-    s.string({ size: 'variable' }).serialize('metadata'),
-    programId.bytes,
-    s.publicKey().serialize(seeds.mint),
+    string({ size: 'variable' }).serialize('metadata'),
+    publicKeySerializer().serialize(programId),
+    publicKeySerializer().serialize(seeds.mint),
   ]);
 }
 
 export async function fetchMetadataFromSeeds(
-  context: Pick<Context, 'eddsa' | 'programs' | 'rpc' | 'serializer'>,
+  context: Pick<Context, 'eddsa' | 'programs' | 'rpc'>,
   seeds: Parameters<typeof findMetadataPda>[1],
   options?: RpcGetAccountOptions
 ): Promise<Metadata> {
@@ -272,7 +289,7 @@ export async function fetchMetadataFromSeeds(
 }
 
 export async function safeFetchMetadataFromSeeds(
-  context: Pick<Context, 'eddsa' | 'programs' | 'rpc' | 'serializer'>,
+  context: Pick<Context, 'eddsa' | 'programs' | 'rpc'>,
   seeds: Parameters<typeof findMetadataPda>[1],
   options?: RpcGetAccountOptions
 ): Promise<Metadata | null> {

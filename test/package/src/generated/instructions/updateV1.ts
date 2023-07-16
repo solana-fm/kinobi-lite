@@ -10,16 +10,28 @@ import {
   AccountMeta,
   Context,
   Option,
+  OptionOrNullable,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   publicKey,
   some,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  array,
+  bool,
+  mapSerializer,
+  option,
+  publicKey as publicKeySerializer,
+  string,
+  struct,
+  u16,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 import {
   AuthorityType,
   AuthorityTypeArgs,
@@ -56,23 +68,23 @@ export type UpdateV1InstructionAccounts = {
   /** Update authority or delegate */
   authority?: Signer;
   /** Metadata account */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Master Edition account */
-  masterEdition?: PublicKey;
+  masterEdition?: PublicKey | Pda;
   /** Mint account */
-  mint: PublicKey;
+  mint: PublicKey | Pda;
   /** System program */
-  systemProgram?: PublicKey;
+  systemProgram?: PublicKey | Pda;
   /** System program */
-  sysvarInstructions?: PublicKey;
+  sysvarInstructions?: PublicKey | Pda;
   /** Token account */
-  token?: PublicKey;
+  token?: PublicKey | Pda;
   /** Delegate record PDA */
-  delegateRecord?: PublicKey;
+  delegateRecord?: PublicKey | Pda;
   /** Token Authorization Rules Program */
-  authorizationRulesProgram?: PublicKey;
+  authorizationRulesProgram?: PublicKey | Pda;
   /** Token Authorization Rules account */
-  authorizationRules?: PublicKey;
+  authorizationRules?: PublicKey | Pda;
 };
 
 // Data.
@@ -100,71 +112,69 @@ export type UpdateV1InstructionData = {
 };
 
 export type UpdateV1InstructionDataArgs = {
-  authorizationData: Option<AuthorizationDataArgs>;
-  newUpdateAuthority: Option<PublicKey>;
-  data: Option<{
+  authorizationData: OptionOrNullable<AuthorizationDataArgs>;
+  newUpdateAuthority: OptionOrNullable<PublicKey>;
+  data: OptionOrNullable<{
     name: string;
     symbol: string;
     uri: string;
     sellerFeeBasisPoints: number;
-    creators: Option<Array<CreatorArgs>>;
+    creators: OptionOrNullable<Array<CreatorArgs>>;
   }>;
-  primarySaleHappened: Option<boolean>;
-  isMutable: Option<boolean>;
-  tokenStandard?: Option<TokenStandardArgs>;
-  collection?: Option<CollectionArgs>;
-  uses: Option<UsesArgs>;
-  collectionDetails: Option<CollectionDetailsArgs>;
-  programmableConfig: Option<ProgrammableConfigArgs>;
-  delegateState: Option<DelegateStateArgs>;
+  primarySaleHappened: OptionOrNullable<boolean>;
+  isMutable: OptionOrNullable<boolean>;
+  tokenStandard?: OptionOrNullable<TokenStandardArgs>;
+  collection?: OptionOrNullable<CollectionArgs>;
+  uses: OptionOrNullable<UsesArgs>;
+  collectionDetails: OptionOrNullable<CollectionDetailsArgs>;
+  programmableConfig: OptionOrNullable<ProgrammableConfigArgs>;
+  delegateState: OptionOrNullable<DelegateStateArgs>;
   authorityType: AuthorityTypeArgs;
 };
 
+/** @deprecated Use `getUpdateV1InstructionDataSerializer()` without any argument instead. */
 export function getUpdateV1InstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<UpdateV1InstructionDataArgs, UpdateV1InstructionData>;
+export function getUpdateV1InstructionDataSerializer(): Serializer<
+  UpdateV1InstructionDataArgs,
+  UpdateV1InstructionData
+>;
+export function getUpdateV1InstructionDataSerializer(
+  _context: object = {}
 ): Serializer<UpdateV1InstructionDataArgs, UpdateV1InstructionData> {
-  const s = context.serializer;
   return mapSerializer<
     UpdateV1InstructionDataArgs,
     any,
     UpdateV1InstructionData
   >(
-    s.struct<UpdateV1InstructionData>(
+    struct<UpdateV1InstructionData>(
       [
-        ['discriminator', s.u8()],
-        ['updateV1Discriminator', s.u8()],
-        [
-          'authorizationData',
-          s.option(getAuthorizationDataSerializer(context)),
-        ],
-        ['newUpdateAuthority', s.option(s.publicKey())],
+        ['discriminator', u8()],
+        ['updateV1Discriminator', u8()],
+        ['authorizationData', option(getAuthorizationDataSerializer())],
+        ['newUpdateAuthority', option(publicKeySerializer())],
         [
           'data',
-          s.option(
-            s.struct<any>([
-              ['name', s.string()],
-              ['symbol', s.string()],
-              ['uri', s.string()],
-              ['sellerFeeBasisPoints', s.u16()],
-              ['creators', s.option(s.array(getCreatorSerializer(context)))],
+          option(
+            struct<any>([
+              ['name', string()],
+              ['symbol', string()],
+              ['uri', string()],
+              ['sellerFeeBasisPoints', u16()],
+              ['creators', option(array(getCreatorSerializer()))],
             ])
           ),
         ],
-        ['primarySaleHappened', s.option(s.bool())],
-        ['isMutable', s.option(s.bool())],
-        ['tokenStandard', s.option(getTokenStandardSerializer(context))],
-        ['collection', s.option(getCollectionSerializer(context))],
-        ['uses', s.option(getUsesSerializer(context))],
-        [
-          'collectionDetails',
-          s.option(getCollectionDetailsSerializer(context)),
-        ],
-        [
-          'programmableConfig',
-          s.option(getProgrammableConfigSerializer(context)),
-        ],
-        ['delegateState', s.option(getDelegateStateSerializer(context))],
-        ['authorityType', getAuthorityTypeSerializer(context)],
+        ['primarySaleHappened', option(bool())],
+        ['isMutable', option(bool())],
+        ['tokenStandard', option(getTokenStandardSerializer())],
+        ['collection', option(getCollectionSerializer())],
+        ['uses', option(getUsesSerializer())],
+        ['collectionDetails', option(getCollectionDetailsSerializer())],
+        ['programmableConfig', option(getProgrammableConfigSerializer())],
+        ['delegateState', option(getDelegateStateSerializer())],
+        ['authorityType', getAuthorityTypeSerializer()],
       ],
       { description: 'UpdateV1InstructionData' }
     ),
@@ -187,144 +197,109 @@ export type UpdateV1InstructionArgs = UpdateV1InstructionDataArgs;
 
 // Instruction.
 export function updateV1(
-  context: Pick<Context, 'serializer' | 'programs' | 'identity'>,
+  context: Pick<Context, 'programs' | 'identity'>,
   input: UpdateV1InstructionAccounts & UpdateV1InstructionArgs
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    metadata: [input.metadata, true] as const,
+    mint: [input.mint, false] as const,
+  };
   const resolvingArgs = {};
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authority',
-    input.authority ?? context.identity
+    input.authority
+      ? ([input.authority, false] as const)
+      : ([context.identity, false] as const)
   );
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'masterEdition',
-    input.masterEdition ?? programId
+    input.masterEdition
+      ? ([input.masterEdition, true] as const)
+      : ([programId, false] as const)
   );
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'systemProgram',
-    input.systemProgram ?? {
-      ...context.programs.getPublicKey(
-        'splSystem',
-        '11111111111111111111111111111111'
-      ),
-      isWritable: false,
-    }
+    input.systemProgram
+      ? ([input.systemProgram, false] as const)
+      : ([
+          context.programs.getPublicKey(
+            'splSystem',
+            '11111111111111111111111111111111'
+          ),
+          false,
+        ] as const)
   );
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'sysvarInstructions',
-    input.sysvarInstructions ??
-      publicKey('Sysvar1nstructions1111111111111111111111111')
+    input.sysvarInstructions
+      ? ([input.sysvarInstructions, false] as const)
+      : ([
+          publicKey('Sysvar1nstructions1111111111111111111111111'),
+          false,
+        ] as const)
   );
-  addObjectProperty(resolvingAccounts, 'token', input.token ?? programId);
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
+    'token',
+    input.token
+      ? ([input.token, false] as const)
+      : ([programId, false] as const)
+  );
+  addObjectProperty(
+    resolvedAccounts,
     'delegateRecord',
-    input.delegateRecord ?? programId
+    input.delegateRecord
+      ? ([input.delegateRecord, false] as const)
+      : ([programId, false] as const)
   );
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authorizationRulesProgram',
-    input.authorizationRulesProgram ?? programId
+    input.authorizationRulesProgram
+      ? ([input.authorizationRulesProgram, false] as const)
+      : ([programId, false] as const)
   );
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authorizationRules',
-    input.authorizationRules ?? programId
+    input.authorizationRules
+      ? ([input.authorizationRules, false] as const)
+      : ([programId, false] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
   const resolvedArgs = { ...input, ...resolvingArgs };
 
-  // Authority.
-  signers.push(resolvedAccounts.authority);
-  keys.push({
-    pubkey: resolvedAccounts.authority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.authority, false),
-  });
-
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Master Edition.
-  keys.push({
-    pubkey: resolvedAccounts.masterEdition,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.masterEdition, true),
-  });
-
-  // Mint.
-  keys.push({
-    pubkey: resolvedAccounts.mint,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.mint, false),
-  });
-
-  // System Program.
-  keys.push({
-    pubkey: resolvedAccounts.systemProgram,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.systemProgram, false),
-  });
-
-  // Sysvar Instructions.
-  keys.push({
-    pubkey: resolvedAccounts.sysvarInstructions,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.sysvarInstructions, false),
-  });
-
-  // Token.
-  keys.push({
-    pubkey: resolvedAccounts.token,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.token, false),
-  });
-
-  // Delegate Record.
-  keys.push({
-    pubkey: resolvedAccounts.delegateRecord,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.delegateRecord, false),
-  });
-
-  // Authorization Rules Program.
-  keys.push({
-    pubkey: resolvedAccounts.authorizationRulesProgram,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.authorizationRulesProgram, false),
-  });
-
-  // Authorization Rules.
-  keys.push({
-    pubkey: resolvedAccounts.authorizationRules,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.authorizationRules, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.authority, false);
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.masterEdition, false);
+  addAccountMeta(keys, signers, resolvedAccounts.mint, false);
+  addAccountMeta(keys, signers, resolvedAccounts.systemProgram, false);
+  addAccountMeta(keys, signers, resolvedAccounts.sysvarInstructions, false);
+  addAccountMeta(keys, signers, resolvedAccounts.token, false);
+  addAccountMeta(keys, signers, resolvedAccounts.delegateRecord, false);
+  addAccountMeta(
+    keys,
+    signers,
+    resolvedAccounts.authorizationRulesProgram,
+    false
+  );
+  addAccountMeta(keys, signers, resolvedAccounts.authorizationRules, false);
 
   // Data.
-  const data =
-    getUpdateV1InstructionDataSerializer(context).serialize(resolvedArgs);
+  const data = getUpdateV1InstructionDataSerializer().serialize(resolvedArgs);
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

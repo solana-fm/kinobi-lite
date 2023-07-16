@@ -9,18 +9,24 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  array,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 
 // Accounts.
 export type SetMintAuthorityInstructionAccounts = {
-  candyMachine: PublicKey;
+  candyMachine: PublicKey | Pda;
   authority?: Signer;
   mintAuthority: Signer;
 };
@@ -30,20 +36,30 @@ export type SetMintAuthorityInstructionData = { discriminator: Array<number> };
 
 export type SetMintAuthorityInstructionDataArgs = {};
 
+/** @deprecated Use `getSetMintAuthorityInstructionDataSerializer()` without any argument instead. */
 export function getSetMintAuthorityInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  SetMintAuthorityInstructionDataArgs,
+  SetMintAuthorityInstructionData
+>;
+export function getSetMintAuthorityInstructionDataSerializer(): Serializer<
+  SetMintAuthorityInstructionDataArgs,
+  SetMintAuthorityInstructionData
+>;
+export function getSetMintAuthorityInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   SetMintAuthorityInstructionDataArgs,
   SetMintAuthorityInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     SetMintAuthorityInstructionDataArgs,
     any,
     SetMintAuthorityInstructionData
   >(
-    s.struct<SetMintAuthorityInstructionData>(
-      [['discriminator', s.array(s.u8(), { size: 8 })]],
+    struct<SetMintAuthorityInstructionData>(
+      [['discriminator', array(u8(), { size: 8 })]],
       { description: 'SetMintAuthorityInstructionData' }
     ),
     (value) => ({
@@ -58,57 +74,37 @@ export function getSetMintAuthorityInstructionDataSerializer(
 
 // Instruction.
 export function setMintAuthority(
-  context: Pick<Context, 'serializer' | 'programs' | 'identity'>,
+  context: Pick<Context, 'programs' | 'identity'>,
   input: SetMintAuthorityInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplCandyMachineCore',
-      'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplCandyMachineCore',
+    'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    candyMachine: [input.candyMachine, true] as const,
+    mintAuthority: [input.mintAuthority, false] as const,
+  };
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authority',
-    input.authority ?? context.identity
+    input.authority
+      ? ([input.authority, false] as const)
+      : ([context.identity, false] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
 
-  // Candy Machine.
-  keys.push({
-    pubkey: resolvedAccounts.candyMachine,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.candyMachine, true),
-  });
-
-  // Authority.
-  signers.push(resolvedAccounts.authority);
-  keys.push({
-    pubkey: resolvedAccounts.authority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.authority, false),
-  });
-
-  // Mint Authority.
-  signers.push(resolvedAccounts.mintAuthority);
-  keys.push({
-    pubkey: resolvedAccounts.mintAuthority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.mintAuthority, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.candyMachine, false);
+  addAccountMeta(keys, signers, resolvedAccounts.authority, false);
+  addAccountMeta(keys, signers, resolvedAccounts.mintAuthority, false);
 
   // Data.
-  const data = getSetMintAuthorityInstructionDataSerializer(context).serialize(
-    {}
-  );
+  const data = getSetMintAuthorityInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

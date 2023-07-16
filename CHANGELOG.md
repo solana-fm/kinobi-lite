@@ -1,5 +1,47 @@
 # @metaplex-foundation/kinobi
 
+## 0.12.0
+
+### Minor Changes
+
+- [#52](https://github.com/metaplex-foundation/kinobi/pull/52) [`0221889`](https://github.com/metaplex-foundation/kinobi/commit/0221889142300e69cde17eed136a94d82598b715) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Default optional account strategy to program ID
+
+## 0.11.1
+
+### Patch Changes
+
+- [`205cfad`](https://github.com/metaplex-foundation/kinobi/commit/205cfadc9f498d45c3c0a3b8a2dbdb3546b3eff4) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Fix unused serializer import for booleans
+
+## 0.11.0
+
+### Minor Changes
+
+- [#49](https://github.com/metaplex-foundation/kinobi/pull/49) [`3f54670`](https://github.com/metaplex-foundation/kinobi/commit/3f546701d1c6b08d4237783e4e258e16d758fa2c) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Update Umi to v0.8.2
+
+## 0.10.2
+
+### Patch Changes
+
+- [`a3a9987`](https://github.com/metaplex-foundation/kinobi/commit/a3a9987a8a8ef9609c131345add0d1fcd8c94253) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Add UnwrapTupleEnumWithSingleStructVisitor
+
+## 0.10.1
+
+### Patch Changes
+
+- [`88939ca`](https://github.com/metaplex-foundation/kinobi/commit/88939cabecacd3f107e8579580e74b83a7ff0bea) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Pass unresolved raw accounts to resolvers
+
+## 0.10.0
+
+### Minor Changes
+
+- [#45](https://github.com/metaplex-foundation/kinobi/pull/45) [`6210eeb`](https://github.com/metaplex-foundation/kinobi/commit/6210eebf5554f15877e5aad71417434fa44132e3) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Use PublicKeys as base58 strings. See `@metaplex-foundation/umi` changelog for more details.
+
+## 0.9.0
+
+### Minor Changes
+
+- [`05b9c36`](https://github.com/metaplex-foundation/kinobi/commit/05b9c361623c2f41ed5923a9818817965afd5728) Thanks [@lorisleiva](https://github.com/lorisleiva)! - Rename mpl-essentials to mpl-toolbox
+
 ## 0.8.5
 
 ### Patch Changes

@@ -10,20 +10,29 @@ import {
   AccountMeta,
   Context,
   Option,
+  OptionOrNullable,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  bool,
+  mapSerializer,
+  option,
+  publicKey as publicKeySerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 import { DataV2, DataV2Args, getDataV2Serializer } from '../types';
 
 // Accounts.
 export type UpdateMetadataAccountV2InstructionAccounts = {
   /** Metadata account */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Update authority key */
   updateAuthority: Signer;
 };
@@ -38,31 +47,41 @@ export type UpdateMetadataAccountV2InstructionData = {
 };
 
 export type UpdateMetadataAccountV2InstructionDataArgs = {
-  data: Option<DataV2Args>;
-  updateAuthority: Option<PublicKey>;
-  primarySaleHappened: Option<boolean>;
-  isMutable: Option<boolean>;
+  data: OptionOrNullable<DataV2Args>;
+  updateAuthority: OptionOrNullable<PublicKey>;
+  primarySaleHappened: OptionOrNullable<boolean>;
+  isMutable: OptionOrNullable<boolean>;
 };
 
+/** @deprecated Use `getUpdateMetadataAccountV2InstructionDataSerializer()` without any argument instead. */
 export function getUpdateMetadataAccountV2InstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  UpdateMetadataAccountV2InstructionDataArgs,
+  UpdateMetadataAccountV2InstructionData
+>;
+export function getUpdateMetadataAccountV2InstructionDataSerializer(): Serializer<
+  UpdateMetadataAccountV2InstructionDataArgs,
+  UpdateMetadataAccountV2InstructionData
+>;
+export function getUpdateMetadataAccountV2InstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   UpdateMetadataAccountV2InstructionDataArgs,
   UpdateMetadataAccountV2InstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     UpdateMetadataAccountV2InstructionDataArgs,
     any,
     UpdateMetadataAccountV2InstructionData
   >(
-    s.struct<UpdateMetadataAccountV2InstructionData>(
+    struct<UpdateMetadataAccountV2InstructionData>(
       [
-        ['discriminator', s.u8()],
-        ['data', s.option(getDataV2Serializer(context))],
-        ['updateAuthority', s.option(s.publicKey())],
-        ['primarySaleHappened', s.option(s.bool())],
-        ['isMutable', s.option(s.bool())],
+        ['discriminator', u8()],
+        ['data', option(getDataV2Serializer())],
+        ['updateAuthority', option(publicKeySerializer())],
+        ['primarySaleHappened', option(bool())],
+        ['isMutable', option(bool())],
       ],
       { description: 'UpdateMetadataAccountV2InstructionData' }
     ),
@@ -79,7 +98,7 @@ export type UpdateMetadataAccountV2InstructionArgs =
 
 // Instruction.
 export function updateMetadataAccountV2(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   accounts: UpdateMetadataAccountV2InstructionAccounts,
   args: UpdateMetadataAccountV2InstructionArgs
 ): TransactionBuilder {
@@ -87,38 +106,25 @@ export function updateMetadataAccountV2(
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    metadata: [accounts.metadata, true] as const,
+    updateAuthority: [accounts.updateAuthority, false] as const,
+  };
   const resolvingArgs = {};
-  const resolvedAccounts = { ...accounts, ...resolvingAccounts };
   const resolvedArgs = { ...args, ...resolvingArgs };
 
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Update Authority.
-  signers.push(resolvedAccounts.updateAuthority);
-  keys.push({
-    pubkey: resolvedAccounts.updateAuthority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.updateAuthority, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.updateAuthority, false);
 
   // Data.
   const data =
-    getUpdateMetadataAccountV2InstructionDataSerializer(context).serialize(
+    getUpdateMetadataAccountV2InstructionDataSerializer().serialize(
       resolvedArgs
     );
 

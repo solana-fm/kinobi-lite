@@ -9,19 +9,24 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 
 // Accounts.
 export type SignMetadataInstructionAccounts = {
   /** Metadata (pda of ['metadata', program id, mint id]) */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Creator */
   creator: Signer;
 };
@@ -31,16 +36,23 @@ export type SignMetadataInstructionData = { discriminator: number };
 
 export type SignMetadataInstructionDataArgs = {};
 
+/** @deprecated Use `getSignMetadataInstructionDataSerializer()` without any argument instead. */
 export function getSignMetadataInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<SignMetadataInstructionDataArgs, SignMetadataInstructionData>;
+export function getSignMetadataInstructionDataSerializer(): Serializer<
+  SignMetadataInstructionDataArgs,
+  SignMetadataInstructionData
+>;
+export function getSignMetadataInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<SignMetadataInstructionDataArgs, SignMetadataInstructionData> {
-  const s = context.serializer;
   return mapSerializer<
     SignMetadataInstructionDataArgs,
     any,
     SignMetadataInstructionData
   >(
-    s.struct<SignMetadataInstructionData>([['discriminator', s.u8()]], {
+    struct<SignMetadataInstructionData>([['discriminator', u8()]], {
       description: 'SignMetadataInstructionData',
     }),
     (value) => ({ ...value, discriminator: 7 })
@@ -49,42 +61,29 @@ export function getSignMetadataInstructionDataSerializer(
 
 // Instruction.
 export function signMetadata(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: SignMetadataInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
+  const resolvedAccounts = {
+    metadata: [input.metadata, true] as const,
+    creator: [input.creator, false] as const,
+  };
 
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Creator.
-  signers.push(resolvedAccounts.creator);
-  keys.push({
-    pubkey: resolvedAccounts.creator.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.creator, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.creator, false);
 
   // Data.
-  const data = getSignMetadataInstructionDataSerializer(context).serialize({});
+  const data = getSignMetadataInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

@@ -9,19 +9,26 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  array,
+  mapSerializer,
+  struct,
+  u32,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 import { ConfigLine, ConfigLineArgs, getConfigLineSerializer } from '../types';
 
 // Accounts.
 export type AddConfigLinesInstructionAccounts = {
-  candyMachine: PublicKey;
+  candyMachine: PublicKey | Pda;
   authority?: Signer;
 };
 
@@ -37,23 +44,30 @@ export type AddConfigLinesInstructionDataArgs = {
   configLines: Array<ConfigLineArgs>;
 };
 
+/** @deprecated Use `getAddConfigLinesInstructionDataSerializer()` without any argument instead. */
 export function getAddConfigLinesInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<AddConfigLinesInstructionDataArgs, AddConfigLinesInstructionData>;
+export function getAddConfigLinesInstructionDataSerializer(): Serializer<
+  AddConfigLinesInstructionDataArgs,
+  AddConfigLinesInstructionData
+>;
+export function getAddConfigLinesInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   AddConfigLinesInstructionDataArgs,
   AddConfigLinesInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     AddConfigLinesInstructionDataArgs,
     any,
     AddConfigLinesInstructionData
   >(
-    s.struct<AddConfigLinesInstructionData>(
+    struct<AddConfigLinesInstructionData>(
       [
-        ['discriminator', s.array(s.u8(), { size: 8 })],
-        ['index', s.u32()],
-        ['configLines', s.array(getConfigLineSerializer(context))],
+        ['discriminator', array(u8(), { size: 8 })],
+        ['index', u32()],
+        ['configLines', array(getConfigLineSerializer())],
       ],
       { description: 'AddConfigLinesInstructionData' }
     ),
@@ -72,50 +86,38 @@ export type AddConfigLinesInstructionArgs = AddConfigLinesInstructionDataArgs;
 
 // Instruction.
 export function addConfigLines(
-  context: Pick<Context, 'serializer' | 'programs' | 'identity'>,
+  context: Pick<Context, 'programs' | 'identity'>,
   input: AddConfigLinesInstructionAccounts & AddConfigLinesInstructionArgs
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplCandyMachineCore',
-      'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplCandyMachineCore',
+    'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    candyMachine: [input.candyMachine, true] as const,
+  };
   const resolvingArgs = {};
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authority',
-    input.authority ?? context.identity
+    input.authority
+      ? ([input.authority, false] as const)
+      : ([context.identity, false] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
   const resolvedArgs = { ...input, ...resolvingArgs };
 
-  // Candy Machine.
-  keys.push({
-    pubkey: resolvedAccounts.candyMachine,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.candyMachine, true),
-  });
-
-  // Authority.
-  signers.push(resolvedAccounts.authority);
-  keys.push({
-    pubkey: resolvedAccounts.authority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.authority, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.candyMachine, false);
+  addAccountMeta(keys, signers, resolvedAccounts.authority, false);
 
   // Data.
   const data =
-    getAddConfigLinesInstructionDataSerializer(context).serialize(resolvedArgs);
+    getAddConfigLinesInstructionDataSerializer().serialize(resolvedArgs);
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

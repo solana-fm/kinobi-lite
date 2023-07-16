@@ -67,8 +67,10 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
       dependencyMap: {
         generated: '..',
         hooked: '../../hooked',
-        core: '@metaplex-foundation/umi',
-        mplEssentials: '@metaplex-foundation/mpl-essentials',
+        umi: '@metaplex-foundation/umi',
+        umiSerializers: '@metaplex-foundation/umi/serializers',
+        mplEssentials: '@metaplex-foundation/mpl-toolbox',
+        mplToolbox: '@metaplex-foundation/mpl-toolbox',
         ...options.dependencyMap,
         // Custom relative dependencies to link generated files together.
         generatedAccounts: '../accounts',
@@ -168,7 +170,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
         `errors/${camelCase(name)}.ts`,
         this.render('errorsPage.njk', {
           imports: new JavaScriptImportMap()
-            .add('core', ['ProgramError', 'Program'])
+            .add('umi', ['ProgramError', 'Program'])
             .toString(this.options.dependencyMap),
           program,
           errors: program.errors.map((error) => ({
@@ -181,13 +183,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
         `programs/${camelCase(name)}.ts`,
         this.render('programsPage.njk', {
           imports: new JavaScriptImportMap()
-            .add('core', [
-              'ClusterFilter',
-              'Context',
-              'Program',
-              'publicKey',
-              'PublicKey',
-            ])
+            .add('umi', ['ClusterFilter', 'Context', 'Program', 'PublicKey'])
             .add('errors', [
               `get${pascalCaseName}ErrorFromCode`,
               `get${pascalCaseName}ErrorFromName`,
@@ -210,17 +206,21 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
     if (!isLinked) {
       imports.mergeWith(typeManifest.looseImports);
     }
-    imports.add('core', [
-      'Account',
-      'assertAccountExists',
-      'Context',
-      'deserializeAccount',
-      'PublicKey',
-      'RpcAccount',
-      'RpcGetAccountOptions',
-      'RpcGetAccountsOptions',
-      ...(!isLinked ? ['Serializer'] : []),
-    ]);
+    imports
+      .add('umi', [
+        'Account',
+        'assertAccountExists',
+        'Context',
+        'deserializeAccount',
+        'Pda',
+        'PublicKey',
+        'publicKey',
+        'RpcAccount',
+        'RpcGetAccountOptions',
+        'RpcGetAccountsOptions',
+      ])
+      .add('umiSerializers', !isLinked ? ['Serializer'] : [])
+      .addAlias('umi', 'publicKey', 'toPublicKey');
 
     // Discriminator.
     const { discriminator } = account;
@@ -264,7 +264,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
     });
     let resolvedGpaFields: { type: string; argument: string } | null = null;
     if (gpaFields.length > 0) {
-      imports.add('core', ['gpaBuilder']);
+      imports.add('umi', ['gpaBuilder']);
       resolvedGpaFields = {
         type: `{ ${gpaFields
           .map((f) => `'${f.name}': ${f.manifest.looseType}`)
@@ -279,8 +279,6 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
     }
 
     // Seeds.
-    const pdaHelperNeedsSerializer =
-      account.seeds.filter((seed) => seed.kind !== 'programId').length > 0;
     const seeds = account.seeds.map((seed) => {
       if (seed.kind === 'constant') {
         const seedManifest = visit(seed.type, this.typeManifestVisitor);
@@ -299,10 +297,13 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
         );
         return { ...seed, typeManifest: seedManifest };
       }
+      imports
+        .add('umiSerializers', 'publicKey')
+        .addAlias('umiSerializers', 'publicKey', 'publicKeySerializer');
       return seed;
     });
     if (seeds.length > 0) {
-      imports.add('core', ['Pda']);
+      imports.add('umi', ['Pda']);
     }
     const hasVariableSeeds =
       account.seeds.filter((seed) => seed.kind === 'variable').length > 0;
@@ -317,7 +318,6 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
         discriminator: resolvedDiscriminator,
         gpaFields: resolvedGpaFields,
         seeds,
-        pdaHelperNeedsSerializer,
         hasVariableSeeds,
       })
     );
@@ -325,7 +325,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
 
   visitInstruction(instruction: nodes.InstructionNode): RenderMap {
     // Imports.
-    const imports = new JavaScriptImportMap().add('core', [
+    const imports = new JavaScriptImportMap().add('umi', [
       'AccountMeta',
       'Context',
       'Signer',
@@ -411,7 +411,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
     });
     imports.mergeWith(this.getInstructionAccountImports(accounts));
     if (accounts.length > 0) {
-      imports.add('shared', 'isWritable');
+      imports.add('shared', 'addAccountMeta');
     }
 
     // Data Args.
@@ -420,15 +420,17 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
       instruction.dataArgs,
       this.typeManifestVisitor
     );
-    imports.mergeWith(
-      dataArgManifest.looseImports,
-      dataArgManifest.serializerImports
-    );
+    if (linkedDataArgs || hasData) {
+      imports.mergeWith(
+        dataArgManifest.looseImports,
+        dataArgManifest.serializerImports
+      );
+    }
     if (!linkedDataArgs) {
       imports.mergeWith(dataArgManifest.strictImports);
     }
     if (!linkedDataArgs && hasData) {
-      imports.add('core', ['Serializer']);
+      imports.add('umiSerializers', ['Serializer']);
     }
 
     // Extra args.
@@ -452,7 +454,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
     // Bytes created on chain.
     const bytes = instruction.bytesCreatedOnChain;
     if (bytes && 'includeHeader' in bytes && bytes.includeHeader) {
-      imports.add('core', 'ACCOUNT_HEADER_SIZE');
+      imports.add('umi', 'ACCOUNT_HEADER_SIZE');
     }
     if (bytes?.kind === 'account') {
       const accountName = pascalCase(bytes.name);
@@ -524,7 +526,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
     const typeManifest = visit(definedType, this.typeManifestVisitor);
     const imports = new JavaScriptImportMap()
       .mergeWithManifest(typeManifest)
-      .add('core', ['Context', 'Serializer'])
+      .add('umiSerializers', ['Serializer'])
       .remove('generatedTypes', [
         pascalCaseName,
         `${pascalCaseName}Args`,
@@ -563,8 +565,8 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
     account: ResolvedInstructionAccount
   ): string {
     if (account.isPda && account.isSigner === false) return 'Pda';
-    if (account.isSigner === 'either') return 'PublicKey | Signer';
-    return account.isSigner ? 'Signer' : 'PublicKey';
+    if (account.isSigner === 'either') return 'PublicKey | Pda | Signer';
+    return account.isSigner ? 'Signer' : 'PublicKey | Pda';
   }
 
   protected getInstructionAccountImports(
@@ -572,11 +574,13 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
   ): JavaScriptImportMap {
     const imports = new JavaScriptImportMap();
     accounts.forEach((account) => {
-      if (account.isPda && account.isSigner === false) {
-        imports.add('core', 'Pda');
-      }
+      if (account.isSigner !== true && !account.isPda)
+        imports.add('umi', 'PublicKey');
+      if (account.isSigner !== true) imports.add('umi', 'Pda');
+      if (account.isSigner !== false) imports.add('umi', 'Signer');
+
       if (account.defaultsTo?.kind === 'publicKey') {
-        imports.add('core', 'publicKey');
+        imports.add('umi', 'publicKey');
       } else if (account.defaultsTo?.kind === 'pda') {
         const pdaAccount = pascalCase(account.defaultsTo.pdaAccount);
         const importFrom =
@@ -586,7 +590,7 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
         imports.add(importFrom, `find${pdaAccount}Pda`);
         Object.values(account.defaultsTo.seeds).forEach((seed) => {
           if (seed.kind === 'account') {
-            imports.add('core', 'publicKey');
+            imports.add('umi', 'publicKey');
           }
         });
       } else if (account.defaultsTo?.kind === 'resolver') {
@@ -594,13 +598,6 @@ export class GetJavaScriptRenderMapVisitor extends BaseThrowVisitor<RenderMap> {
           account.defaultsTo.importFrom,
           camelCase(account.defaultsTo.name)
         );
-      }
-      if (account.resolvedIsSigner === 'either') {
-        imports.add('core', ['PublicKey', 'publicKey', 'Signer', 'isSigner']);
-      } else if (account.resolvedIsSigner) {
-        imports.add('core', 'Signer');
-      } else {
-        imports.add('core', 'PublicKey');
       }
     });
     return imports;
