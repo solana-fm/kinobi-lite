@@ -9,16 +9,23 @@
 import {
   Account,
   Context,
+  Pda,
   PublicKey,
   RpcAccount,
   RpcGetAccountOptions,
   RpcGetAccountsOptions,
-  Serializer,
   assertAccountExists,
   deserializeAccount,
   gpaBuilder,
-  mapSerializer,
+  publicKey as toPublicKey,
 } from '@metaplex-foundation/umi';
+import {
+  Serializer,
+  array,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
 import { TmKey, TmKeyArgs, getTmKeySerializer } from '../types';
 
 export type EditionMarker = Account<EditionMarkerAccountData>;
@@ -27,19 +34,26 @@ export type EditionMarkerAccountData = { key: TmKey; ledger: Array<number> };
 
 export type EditionMarkerAccountDataArgs = { ledger: Array<number> };
 
+/** @deprecated Use `getEditionMarkerAccountDataSerializer()` without any argument instead. */
 export function getEditionMarkerAccountDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<EditionMarkerAccountDataArgs, EditionMarkerAccountData>;
+export function getEditionMarkerAccountDataSerializer(): Serializer<
+  EditionMarkerAccountDataArgs,
+  EditionMarkerAccountData
+>;
+export function getEditionMarkerAccountDataSerializer(
+  _context: object = {}
 ): Serializer<EditionMarkerAccountDataArgs, EditionMarkerAccountData> {
-  const s = context.serializer;
   return mapSerializer<
     EditionMarkerAccountDataArgs,
     any,
     EditionMarkerAccountData
   >(
-    s.struct<EditionMarkerAccountData>(
+    struct<EditionMarkerAccountData>(
       [
-        ['key', getTmKeySerializer(context)],
-        ['ledger', s.array(s.u8(), { size: 31 })],
+        ['key', getTmKeySerializer()],
+        ['ledger', array(u8(), { size: 31 })],
       ],
       { description: 'EditionMarkerAccountData' }
     ),
@@ -47,77 +61,92 @@ export function getEditionMarkerAccountDataSerializer(
   ) as Serializer<EditionMarkerAccountDataArgs, EditionMarkerAccountData>;
 }
 
+/** @deprecated Use `deserializeEditionMarker(rawAccount)` without any context instead. */
 export function deserializeEditionMarker(
-  context: Pick<Context, 'serializer'>,
+  context: object,
   rawAccount: RpcAccount
+): EditionMarker;
+export function deserializeEditionMarker(rawAccount: RpcAccount): EditionMarker;
+export function deserializeEditionMarker(
+  context: RpcAccount | object,
+  rawAccount?: RpcAccount
 ): EditionMarker {
   return deserializeAccount(
-    rawAccount,
-    getEditionMarkerAccountDataSerializer(context)
+    rawAccount ?? (context as RpcAccount),
+    getEditionMarkerAccountDataSerializer()
   );
 }
 
 export async function fetchEditionMarker(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<EditionMarker> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
   assertAccountExists(maybeAccount, 'EditionMarker');
-  return deserializeEditionMarker(context, maybeAccount);
+  return deserializeEditionMarker(maybeAccount);
 }
 
 export async function safeFetchEditionMarker(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<EditionMarker | null> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
-  return maybeAccount.exists
-    ? deserializeEditionMarker(context, maybeAccount)
-    : null;
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
+  return maybeAccount.exists ? deserializeEditionMarker(maybeAccount) : null;
 }
 
 export async function fetchAllEditionMarker(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<EditionMarker[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts.map((maybeAccount) => {
     assertAccountExists(maybeAccount, 'EditionMarker');
-    return deserializeEditionMarker(context, maybeAccount);
+    return deserializeEditionMarker(maybeAccount);
   });
 }
 
 export async function safeFetchAllEditionMarker(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<EditionMarker[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts
     .filter((maybeAccount) => maybeAccount.exists)
     .map((maybeAccount) =>
-      deserializeEditionMarker(context, maybeAccount as RpcAccount)
+      deserializeEditionMarker(maybeAccount as RpcAccount)
     );
 }
 
 export function getEditionMarkerGpaBuilder(
-  context: Pick<Context, 'rpc' | 'serializer' | 'programs'>
+  context: Pick<Context, 'rpc' | 'programs'>
 ) {
-  const s = context.serializer;
   const programId = context.programs.getPublicKey(
     'mplTokenMetadata',
     'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
   );
   return gpaBuilder(context, programId)
     .registerFields<{ key: TmKeyArgs; ledger: Array<number> }>({
-      key: [0, getTmKeySerializer(context)],
-      ledger: [1, s.array(s.u8(), { size: 31 })],
+      key: [0, getTmKeySerializer()],
+      ledger: [1, array(u8(), { size: 31 })],
     })
     .deserializeUsing<EditionMarker>((account) =>
-      deserializeEditionMarker(context, account)
+      deserializeEditionMarker(account)
     )
     .whereField('key', TmKey.EditionMarker);
 }

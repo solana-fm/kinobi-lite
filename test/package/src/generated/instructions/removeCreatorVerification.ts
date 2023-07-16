@@ -9,19 +9,24 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 
 // Accounts.
 export type RemoveCreatorVerificationInstructionAccounts = {
   /** Metadata (pda of ['metadata', program id, mint id]) */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Creator */
   creator: Signer;
 };
@@ -33,20 +38,30 @@ export type RemoveCreatorVerificationInstructionData = {
 
 export type RemoveCreatorVerificationInstructionDataArgs = {};
 
+/** @deprecated Use `getRemoveCreatorVerificationInstructionDataSerializer()` without any argument instead. */
 export function getRemoveCreatorVerificationInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  RemoveCreatorVerificationInstructionDataArgs,
+  RemoveCreatorVerificationInstructionData
+>;
+export function getRemoveCreatorVerificationInstructionDataSerializer(): Serializer<
+  RemoveCreatorVerificationInstructionDataArgs,
+  RemoveCreatorVerificationInstructionData
+>;
+export function getRemoveCreatorVerificationInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   RemoveCreatorVerificationInstructionDataArgs,
   RemoveCreatorVerificationInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     RemoveCreatorVerificationInstructionDataArgs,
     any,
     RemoveCreatorVerificationInstructionData
   >(
-    s.struct<RemoveCreatorVerificationInstructionData>(
-      [['discriminator', s.u8()]],
+    struct<RemoveCreatorVerificationInstructionData>(
+      [['discriminator', u8()]],
       { description: 'RemoveCreatorVerificationInstructionData' }
     ),
     (value) => ({ ...value, discriminator: 28 })
@@ -58,44 +73,30 @@ export function getRemoveCreatorVerificationInstructionDataSerializer(
 
 // Instruction.
 export function removeCreatorVerification(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: RemoveCreatorVerificationInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
+  const resolvedAccounts = {
+    metadata: [input.metadata, true] as const,
+    creator: [input.creator, false] as const,
+  };
 
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Creator.
-  signers.push(resolvedAccounts.creator);
-  keys.push({
-    pubkey: resolvedAccounts.creator.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.creator, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.creator, false);
 
   // Data.
-  const data = getRemoveCreatorVerificationInstructionDataSerializer(
-    context
-  ).serialize({});
+  const data =
+    getRemoveCreatorVerificationInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

@@ -9,23 +9,28 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 
 // Accounts.
 export type ConvertMasterEditionV1ToV2InstructionAccounts = {
   /** Master Record Edition V1 (pda of ['metadata', program id, master metadata mint id, 'edition']) */
-  masterEdition: PublicKey;
+  masterEdition: PublicKey | Pda;
   /** One time authorization mint */
-  oneTimeAuth: PublicKey;
+  oneTimeAuth: PublicKey | Pda;
   /** Printing mint */
-  printingMint: PublicKey;
+  printingMint: PublicKey | Pda;
 };
 
 // Data.
@@ -35,20 +40,30 @@ export type ConvertMasterEditionV1ToV2InstructionData = {
 
 export type ConvertMasterEditionV1ToV2InstructionDataArgs = {};
 
+/** @deprecated Use `getConvertMasterEditionV1ToV2InstructionDataSerializer()` without any argument instead. */
 export function getConvertMasterEditionV1ToV2InstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  ConvertMasterEditionV1ToV2InstructionDataArgs,
+  ConvertMasterEditionV1ToV2InstructionData
+>;
+export function getConvertMasterEditionV1ToV2InstructionDataSerializer(): Serializer<
+  ConvertMasterEditionV1ToV2InstructionDataArgs,
+  ConvertMasterEditionV1ToV2InstructionData
+>;
+export function getConvertMasterEditionV1ToV2InstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   ConvertMasterEditionV1ToV2InstructionDataArgs,
   ConvertMasterEditionV1ToV2InstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     ConvertMasterEditionV1ToV2InstructionDataArgs,
     any,
     ConvertMasterEditionV1ToV2InstructionData
   >(
-    s.struct<ConvertMasterEditionV1ToV2InstructionData>(
-      [['discriminator', s.u8()]],
+    struct<ConvertMasterEditionV1ToV2InstructionData>(
+      [['discriminator', u8()]],
       { description: 'ConvertMasterEditionV1ToV2InstructionData' }
     ),
     (value) => ({ ...value, discriminator: 12 })
@@ -60,50 +75,32 @@ export function getConvertMasterEditionV1ToV2InstructionDataSerializer(
 
 // Instruction.
 export function convertMasterEditionV1ToV2(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: ConvertMasterEditionV1ToV2InstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
+  const resolvedAccounts = {
+    masterEdition: [input.masterEdition, true] as const,
+    oneTimeAuth: [input.oneTimeAuth, true] as const,
+    printingMint: [input.printingMint, true] as const,
+  };
 
-  // Master Edition.
-  keys.push({
-    pubkey: resolvedAccounts.masterEdition,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.masterEdition, true),
-  });
-
-  // One Time Auth.
-  keys.push({
-    pubkey: resolvedAccounts.oneTimeAuth,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.oneTimeAuth, true),
-  });
-
-  // Printing Mint.
-  keys.push({
-    pubkey: resolvedAccounts.printingMint,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.printingMint, true),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.masterEdition, false);
+  addAccountMeta(keys, signers, resolvedAccounts.oneTimeAuth, false);
+  addAccountMeta(keys, signers, resolvedAccounts.printingMint, false);
 
   // Data.
-  const data = getConvertMasterEditionV1ToV2InstructionDataSerializer(
-    context
-  ).serialize({});
+  const data =
+    getConvertMasterEditionV1ToV2InstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

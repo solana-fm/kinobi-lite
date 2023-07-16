@@ -10,16 +10,25 @@ import {
   Account,
   Context,
   Option,
+  OptionOrNullable,
+  Pda,
   PublicKey,
   RpcAccount,
   RpcGetAccountOptions,
   RpcGetAccountsOptions,
-  Serializer,
   assertAccountExists,
   deserializeAccount,
   gpaBuilder,
-  mapSerializer,
+  publicKey as toPublicKey,
 } from '@metaplex-foundation/umi';
+import {
+  Serializer,
+  mapSerializer,
+  option,
+  publicKey as publicKeySerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
 import { TmKey, TmKeyArgs, getTmKeySerializer } from '../types';
 
 export type CollectionAuthorityRecord =
@@ -33,26 +42,36 @@ export type CollectionAuthorityRecordAccountData = {
 
 export type CollectionAuthorityRecordAccountDataArgs = {
   bump: number;
-  updateAuthority: Option<PublicKey>;
+  updateAuthority: OptionOrNullable<PublicKey>;
 };
 
+/** @deprecated Use `getCollectionAuthorityRecordAccountDataSerializer()` without any argument instead. */
 export function getCollectionAuthorityRecordAccountDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  CollectionAuthorityRecordAccountDataArgs,
+  CollectionAuthorityRecordAccountData
+>;
+export function getCollectionAuthorityRecordAccountDataSerializer(): Serializer<
+  CollectionAuthorityRecordAccountDataArgs,
+  CollectionAuthorityRecordAccountData
+>;
+export function getCollectionAuthorityRecordAccountDataSerializer(
+  _context: object = {}
 ): Serializer<
   CollectionAuthorityRecordAccountDataArgs,
   CollectionAuthorityRecordAccountData
 > {
-  const s = context.serializer;
   return mapSerializer<
     CollectionAuthorityRecordAccountDataArgs,
     any,
     CollectionAuthorityRecordAccountData
   >(
-    s.struct<CollectionAuthorityRecordAccountData>(
+    struct<CollectionAuthorityRecordAccountData>(
       [
-        ['key', getTmKeySerializer(context)],
-        ['bump', s.u8()],
-        ['updateAuthority', s.option(s.publicKey())],
+        ['key', getTmKeySerializer()],
+        ['bump', u8()],
+        ['updateAuthority', option(publicKeySerializer())],
       ],
       { description: 'CollectionAuthorityRecordAccountData' }
     ),
@@ -63,66 +82,85 @@ export function getCollectionAuthorityRecordAccountDataSerializer(
   >;
 }
 
+/** @deprecated Use `deserializeCollectionAuthorityRecord(rawAccount)` without any context instead. */
 export function deserializeCollectionAuthorityRecord(
-  context: Pick<Context, 'serializer'>,
+  context: object,
   rawAccount: RpcAccount
+): CollectionAuthorityRecord;
+export function deserializeCollectionAuthorityRecord(
+  rawAccount: RpcAccount
+): CollectionAuthorityRecord;
+export function deserializeCollectionAuthorityRecord(
+  context: RpcAccount | object,
+  rawAccount?: RpcAccount
 ): CollectionAuthorityRecord {
   return deserializeAccount(
-    rawAccount,
-    getCollectionAuthorityRecordAccountDataSerializer(context)
+    rawAccount ?? (context as RpcAccount),
+    getCollectionAuthorityRecordAccountDataSerializer()
   );
 }
 
 export async function fetchCollectionAuthorityRecord(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<CollectionAuthorityRecord> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
   assertAccountExists(maybeAccount, 'CollectionAuthorityRecord');
-  return deserializeCollectionAuthorityRecord(context, maybeAccount);
+  return deserializeCollectionAuthorityRecord(maybeAccount);
 }
 
 export async function safeFetchCollectionAuthorityRecord(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<CollectionAuthorityRecord | null> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
   return maybeAccount.exists
-    ? deserializeCollectionAuthorityRecord(context, maybeAccount)
+    ? deserializeCollectionAuthorityRecord(maybeAccount)
     : null;
 }
 
 export async function fetchAllCollectionAuthorityRecord(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<CollectionAuthorityRecord[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts.map((maybeAccount) => {
     assertAccountExists(maybeAccount, 'CollectionAuthorityRecord');
-    return deserializeCollectionAuthorityRecord(context, maybeAccount);
+    return deserializeCollectionAuthorityRecord(maybeAccount);
   });
 }
 
 export async function safeFetchAllCollectionAuthorityRecord(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<CollectionAuthorityRecord[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts
     .filter((maybeAccount) => maybeAccount.exists)
     .map((maybeAccount) =>
-      deserializeCollectionAuthorityRecord(context, maybeAccount as RpcAccount)
+      deserializeCollectionAuthorityRecord(maybeAccount as RpcAccount)
     );
 }
 
 export function getCollectionAuthorityRecordGpaBuilder(
-  context: Pick<Context, 'rpc' | 'serializer' | 'programs'>
+  context: Pick<Context, 'rpc' | 'programs'>
 ) {
-  const s = context.serializer;
   const programId = context.programs.getPublicKey(
     'mplTokenMetadata',
     'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
@@ -131,14 +169,14 @@ export function getCollectionAuthorityRecordGpaBuilder(
     .registerFields<{
       key: TmKeyArgs;
       bump: number;
-      updateAuthority: Option<PublicKey>;
+      updateAuthority: OptionOrNullable<PublicKey>;
     }>({
-      key: [0, getTmKeySerializer(context)],
-      bump: [1, s.u8()],
-      updateAuthority: [2, s.option(s.publicKey())],
+      key: [0, getTmKeySerializer()],
+      bump: [1, u8()],
+      updateAuthority: [2, option(publicKeySerializer())],
     })
     .deserializeUsing<CollectionAuthorityRecord>((account) =>
-      deserializeCollectionAuthorityRecord(context, account)
+      deserializeCollectionAuthorityRecord(account)
     )
     .whereField('key', TmKey.CollectionAuthorityRecord);
 }

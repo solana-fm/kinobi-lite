@@ -9,14 +9,20 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  array,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 import {
   CandyMachineData,
   CandyMachineDataArgs,
@@ -25,7 +31,7 @@ import {
 
 // Accounts.
 export type UpdateCandyMachineInstructionAccounts = {
-  candyMachine: PublicKey;
+  candyMachine: PublicKey | Pda;
   authority?: Signer;
 };
 
@@ -39,22 +45,32 @@ export type UpdateCandyMachineInstructionDataArgs = {
   data: CandyMachineDataArgs;
 };
 
+/** @deprecated Use `getUpdateCandyMachineInstructionDataSerializer()` without any argument instead. */
 export function getUpdateCandyMachineInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  UpdateCandyMachineInstructionDataArgs,
+  UpdateCandyMachineInstructionData
+>;
+export function getUpdateCandyMachineInstructionDataSerializer(): Serializer<
+  UpdateCandyMachineInstructionDataArgs,
+  UpdateCandyMachineInstructionData
+>;
+export function getUpdateCandyMachineInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   UpdateCandyMachineInstructionDataArgs,
   UpdateCandyMachineInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     UpdateCandyMachineInstructionDataArgs,
     any,
     UpdateCandyMachineInstructionData
   >(
-    s.struct<UpdateCandyMachineInstructionData>(
+    struct<UpdateCandyMachineInstructionData>(
       [
-        ['discriminator', s.array(s.u8(), { size: 8 })],
-        ['data', getCandyMachineDataSerializer(context)],
+        ['discriminator', array(u8(), { size: 8 })],
+        ['data', getCandyMachineDataSerializer()],
       ],
       { description: 'UpdateCandyMachineInstructionData' }
     ),
@@ -74,7 +90,7 @@ export type UpdateCandyMachineInstructionArgs =
 
 // Instruction.
 export function updateCandyMachine(
-  context: Pick<Context, 'serializer' | 'programs' | 'identity'>,
+  context: Pick<Context, 'programs' | 'identity'>,
   input: UpdateCandyMachineInstructionAccounts &
     UpdateCandyMachineInstructionArgs
 ): TransactionBuilder {
@@ -82,45 +98,31 @@ export function updateCandyMachine(
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplCandyMachineCore',
-      'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplCandyMachineCore',
+    'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    candyMachine: [input.candyMachine, true] as const,
+  };
   const resolvingArgs = {};
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authority',
-    input.authority ?? context.identity
+    input.authority
+      ? ([input.authority, false] as const)
+      : ([context.identity, false] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
   const resolvedArgs = { ...input, ...resolvingArgs };
 
-  // Candy Machine.
-  keys.push({
-    pubkey: resolvedAccounts.candyMachine,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.candyMachine, true),
-  });
-
-  // Authority.
-  signers.push(resolvedAccounts.authority);
-  keys.push({
-    pubkey: resolvedAccounts.authority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.authority, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.candyMachine, false);
+  addAccountMeta(keys, signers, resolvedAccounts.authority, false);
 
   // Data.
   const data =
-    getUpdateCandyMachineInstructionDataSerializer(context).serialize(
-      resolvedArgs
-    );
+    getUpdateCandyMachineInstructionDataSerializer().serialize(resolvedArgs);
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

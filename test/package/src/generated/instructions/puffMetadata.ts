@@ -9,19 +9,24 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 
 // Accounts.
 export type PuffMetadataInstructionAccounts = {
   /** Metadata account */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
 };
 
 // Data.
@@ -29,16 +34,23 @@ export type PuffMetadataInstructionData = { discriminator: number };
 
 export type PuffMetadataInstructionDataArgs = {};
 
+/** @deprecated Use `getPuffMetadataInstructionDataSerializer()` without any argument instead. */
 export function getPuffMetadataInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<PuffMetadataInstructionDataArgs, PuffMetadataInstructionData>;
+export function getPuffMetadataInstructionDataSerializer(): Serializer<
+  PuffMetadataInstructionDataArgs,
+  PuffMetadataInstructionData
+>;
+export function getPuffMetadataInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<PuffMetadataInstructionDataArgs, PuffMetadataInstructionData> {
-  const s = context.serializer;
   return mapSerializer<
     PuffMetadataInstructionDataArgs,
     any,
     PuffMetadataInstructionData
   >(
-    s.struct<PuffMetadataInstructionData>([['discriminator', s.u8()]], {
+    struct<PuffMetadataInstructionData>([['discriminator', u8()]], {
       description: 'PuffMetadataInstructionData',
     }),
     (value) => ({ ...value, discriminator: 14 })
@@ -47,34 +59,27 @@ export function getPuffMetadataInstructionDataSerializer(
 
 // Instruction.
 export function puffMetadata(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: PuffMetadataInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
+  const resolvedAccounts = {
+    metadata: [input.metadata, true] as const,
+  };
 
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
 
   // Data.
-  const data = getPuffMetadataInstructionDataSerializer(context).serialize({});
+  const data = getPuffMetadataInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

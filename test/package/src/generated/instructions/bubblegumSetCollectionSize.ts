@@ -9,14 +9,19 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 import {
   SetCollectionSizeArgs,
   SetCollectionSizeArgsArgs,
@@ -26,15 +31,15 @@ import {
 // Accounts.
 export type BubblegumSetCollectionSizeInstructionAccounts = {
   /** Collection Metadata account */
-  collectionMetadata: PublicKey;
+  collectionMetadata: PublicKey | Pda;
   /** Collection Update authority */
   collectionAuthority: Signer;
   /** Mint of the Collection */
-  collectionMint: PublicKey;
+  collectionMint: PublicKey | Pda;
   /** Signing PDA of Bubblegum program */
   bubblegumSigner: Signer;
   /** Collection Authority Record PDA */
-  collectionAuthorityRecord?: PublicKey;
+  collectionAuthorityRecord?: PublicKey | Pda;
 };
 
 // Data.
@@ -47,22 +52,32 @@ export type BubblegumSetCollectionSizeInstructionDataArgs = {
   setCollectionSizeArgs: SetCollectionSizeArgsArgs;
 };
 
+/** @deprecated Use `getBubblegumSetCollectionSizeInstructionDataSerializer()` without any argument instead. */
 export function getBubblegumSetCollectionSizeInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  BubblegumSetCollectionSizeInstructionDataArgs,
+  BubblegumSetCollectionSizeInstructionData
+>;
+export function getBubblegumSetCollectionSizeInstructionDataSerializer(): Serializer<
+  BubblegumSetCollectionSizeInstructionDataArgs,
+  BubblegumSetCollectionSizeInstructionData
+>;
+export function getBubblegumSetCollectionSizeInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   BubblegumSetCollectionSizeInstructionDataArgs,
   BubblegumSetCollectionSizeInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     BubblegumSetCollectionSizeInstructionDataArgs,
     any,
     BubblegumSetCollectionSizeInstructionData
   >(
-    s.struct<BubblegumSetCollectionSizeInstructionData>(
+    struct<BubblegumSetCollectionSizeInstructionData>(
       [
-        ['discriminator', s.u8()],
-        ['setCollectionSizeArgs', getSetCollectionSizeArgsSerializer(context)],
+        ['discriminator', u8()],
+        ['setCollectionSizeArgs', getSetCollectionSizeArgsSerializer()],
       ],
       { description: 'BubblegumSetCollectionSizeInstructionData' }
     ),
@@ -79,7 +94,7 @@ export type BubblegumSetCollectionSizeInstructionArgs =
 
 // Instruction.
 export function bubblegumSetCollectionSize(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: BubblegumSetCollectionSizeInstructionAccounts &
     BubblegumSetCollectionSizeInstructionArgs
 ): TransactionBuilder {
@@ -87,62 +102,39 @@ export function bubblegumSetCollectionSize(
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    collectionMetadata: [input.collectionMetadata, true] as const,
+    collectionAuthority: [input.collectionAuthority, true] as const,
+    collectionMint: [input.collectionMint, false] as const,
+    bubblegumSigner: [input.bubblegumSigner, false] as const,
+    collectionAuthorityRecord: [
+      input.collectionAuthorityRecord,
+      false,
+    ] as const,
+  };
   const resolvingArgs = {};
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
   const resolvedArgs = { ...input, ...resolvingArgs };
 
-  // Collection Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.collectionMetadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.collectionMetadata, true),
-  });
-
-  // Collection Authority.
-  signers.push(resolvedAccounts.collectionAuthority);
-  keys.push({
-    pubkey: resolvedAccounts.collectionAuthority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.collectionAuthority, true),
-  });
-
-  // Collection Mint.
-  keys.push({
-    pubkey: resolvedAccounts.collectionMint,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.collectionMint, false),
-  });
-
-  // Bubblegum Signer.
-  signers.push(resolvedAccounts.bubblegumSigner);
-  keys.push({
-    pubkey: resolvedAccounts.bubblegumSigner.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.bubblegumSigner, false),
-  });
-
-  // Collection Authority Record (optional).
-  if (resolvedAccounts.collectionAuthorityRecord) {
-    keys.push({
-      pubkey: resolvedAccounts.collectionAuthorityRecord,
-      isSigner: false,
-      isWritable: isWritable(resolvedAccounts.collectionAuthorityRecord, false),
-    });
-  }
+  addAccountMeta(keys, signers, resolvedAccounts.collectionMetadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.collectionAuthority, false);
+  addAccountMeta(keys, signers, resolvedAccounts.collectionMint, false);
+  addAccountMeta(keys, signers, resolvedAccounts.bubblegumSigner, false);
+  addAccountMeta(
+    keys,
+    signers,
+    resolvedAccounts.collectionAuthorityRecord,
+    true
+  );
 
   // Data.
   const data =
-    getBubblegumSetCollectionSizeInstructionDataSerializer(context).serialize(
+    getBubblegumSetCollectionSizeInstructionDataSerializer().serialize(
       resolvedArgs
     );
 

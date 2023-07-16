@@ -9,28 +9,33 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 import { VerifyArgs, VerifyArgsArgs, getVerifyArgsSerializer } from '../types';
 
 // Accounts.
 export type VerifyInstructionAccounts = {
   /** Metadata account */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Collection Update authority */
   collectionAuthority: Signer;
   /** payer */
   payer?: Signer;
   /** Token Authorization Rules account */
-  authorizationRules?: PublicKey;
+  authorizationRules?: PublicKey | Pda;
   /** Token Authorization Rules Program */
-  authorizationRulesProgram?: PublicKey;
+  authorizationRulesProgram?: PublicKey | Pda;
 };
 
 // Data.
@@ -41,15 +46,22 @@ export type VerifyInstructionData = {
 
 export type VerifyInstructionDataArgs = { verifyArgs: VerifyArgsArgs };
 
+/** @deprecated Use `getVerifyInstructionDataSerializer()` without any argument instead. */
 export function getVerifyInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<VerifyInstructionDataArgs, VerifyInstructionData>;
+export function getVerifyInstructionDataSerializer(): Serializer<
+  VerifyInstructionDataArgs,
+  VerifyInstructionData
+>;
+export function getVerifyInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<VerifyInstructionDataArgs, VerifyInstructionData> {
-  const s = context.serializer;
   return mapSerializer<VerifyInstructionDataArgs, any, VerifyInstructionData>(
-    s.struct<VerifyInstructionData>(
+    struct<VerifyInstructionData>(
       [
-        ['discriminator', s.u8()],
-        ['verifyArgs', getVerifyArgsSerializer(context)],
+        ['discriminator', u8()],
+        ['verifyArgs', getVerifyArgsSerializer()],
       ],
       { description: 'VerifyInstructionData' }
     ),
@@ -62,78 +74,60 @@ export type VerifyInstructionArgs = VerifyInstructionDataArgs;
 
 // Instruction.
 export function verify(
-  context: Pick<Context, 'serializer' | 'programs' | 'payer'>,
+  context: Pick<Context, 'programs' | 'payer'>,
   input: VerifyInstructionAccounts & VerifyInstructionArgs
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    metadata: [input.metadata, true] as const,
+    collectionAuthority: [input.collectionAuthority, true] as const,
+  };
   const resolvingArgs = {};
-  addObjectProperty(resolvingAccounts, 'payer', input.payer ?? context.payer);
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
+    'payer',
+    input.payer
+      ? ([input.payer, true] as const)
+      : ([context.payer, true] as const)
+  );
+  addObjectProperty(
+    resolvedAccounts,
     'authorizationRules',
-    input.authorizationRules ?? programId
+    input.authorizationRules
+      ? ([input.authorizationRules, false] as const)
+      : ([programId, false] as const)
   );
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authorizationRulesProgram',
-    input.authorizationRulesProgram ?? programId
+    input.authorizationRulesProgram
+      ? ([input.authorizationRulesProgram, false] as const)
+      : ([programId, false] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
   const resolvedArgs = { ...input, ...resolvingArgs };
 
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Collection Authority.
-  signers.push(resolvedAccounts.collectionAuthority);
-  keys.push({
-    pubkey: resolvedAccounts.collectionAuthority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.collectionAuthority, true),
-  });
-
-  // Payer.
-  signers.push(resolvedAccounts.payer);
-  keys.push({
-    pubkey: resolvedAccounts.payer.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.payer, true),
-  });
-
-  // Authorization Rules.
-  keys.push({
-    pubkey: resolvedAccounts.authorizationRules,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.authorizationRules, false),
-  });
-
-  // Authorization Rules Program.
-  keys.push({
-    pubkey: resolvedAccounts.authorizationRulesProgram,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.authorizationRulesProgram, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.collectionAuthority, false);
+  addAccountMeta(keys, signers, resolvedAccounts.payer, false);
+  addAccountMeta(keys, signers, resolvedAccounts.authorizationRules, false);
+  addAccountMeta(
+    keys,
+    signers,
+    resolvedAccounts.authorizationRulesProgram,
+    false
+  );
 
   // Data.
-  const data =
-    getVerifyInstructionDataSerializer(context).serialize(resolvedArgs);
+  const data = getVerifyInstructionDataSerializer().serialize(resolvedArgs);
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

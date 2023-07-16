@@ -9,27 +9,32 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 
 // Accounts.
 export type ThawDelegatedAccountInstructionAccounts = {
   /** Delegate */
   delegate: Signer;
   /** Token account to thaw */
-  tokenAccount: PublicKey;
+  tokenAccount: PublicKey | Pda;
   /** Edition */
-  edition: PublicKey;
+  edition: PublicKey | Pda;
   /** Token mint */
-  mint: PublicKey;
+  mint: PublicKey | Pda;
   /** Token Program */
-  tokenProgram?: PublicKey;
+  tokenProgram?: PublicKey | Pda;
 };
 
 // Data.
@@ -37,19 +42,29 @@ export type ThawDelegatedAccountInstructionData = { discriminator: number };
 
 export type ThawDelegatedAccountInstructionDataArgs = {};
 
+/** @deprecated Use `getThawDelegatedAccountInstructionDataSerializer()` without any argument instead. */
 export function getThawDelegatedAccountInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  ThawDelegatedAccountInstructionDataArgs,
+  ThawDelegatedAccountInstructionData
+>;
+export function getThawDelegatedAccountInstructionDataSerializer(): Serializer<
+  ThawDelegatedAccountInstructionDataArgs,
+  ThawDelegatedAccountInstructionData
+>;
+export function getThawDelegatedAccountInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   ThawDelegatedAccountInstructionDataArgs,
   ThawDelegatedAccountInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     ThawDelegatedAccountInstructionDataArgs,
     any,
     ThawDelegatedAccountInstructionData
   >(
-    s.struct<ThawDelegatedAccountInstructionData>([['discriminator', s.u8()]], {
+    struct<ThawDelegatedAccountInstructionData>([['discriminator', u8()]], {
       description: 'ThawDelegatedAccountInstructionData',
     }),
     (value) => ({ ...value, discriminator: 27 })
@@ -61,76 +76,47 @@ export function getThawDelegatedAccountInstructionDataSerializer(
 
 // Instruction.
 export function thawDelegatedAccount(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: ThawDelegatedAccountInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    delegate: [input.delegate, true] as const,
+    tokenAccount: [input.tokenAccount, true] as const,
+    edition: [input.edition, false] as const,
+    mint: [input.mint, false] as const,
+  };
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'tokenProgram',
-    input.tokenProgram ?? {
-      ...context.programs.getPublicKey(
-        'splToken',
-        'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
-      ),
-      isWritable: false,
-    }
+    input.tokenProgram
+      ? ([input.tokenProgram, false] as const)
+      : ([
+          context.programs.getPublicKey(
+            'splToken',
+            'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
+          ),
+          false,
+        ] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
 
-  // Delegate.
-  signers.push(resolvedAccounts.delegate);
-  keys.push({
-    pubkey: resolvedAccounts.delegate.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.delegate, true),
-  });
-
-  // Token Account.
-  keys.push({
-    pubkey: resolvedAccounts.tokenAccount,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.tokenAccount, true),
-  });
-
-  // Edition.
-  keys.push({
-    pubkey: resolvedAccounts.edition,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.edition, false),
-  });
-
-  // Mint.
-  keys.push({
-    pubkey: resolvedAccounts.mint,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.mint, false),
-  });
-
-  // Token Program.
-  keys.push({
-    pubkey: resolvedAccounts.tokenProgram,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.tokenProgram, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.delegate, false);
+  addAccountMeta(keys, signers, resolvedAccounts.tokenAccount, false);
+  addAccountMeta(keys, signers, resolvedAccounts.edition, false);
+  addAccountMeta(keys, signers, resolvedAccounts.mint, false);
+  addAccountMeta(keys, signers, resolvedAccounts.tokenProgram, false);
 
   // Data.
-  const data = getThawDelegatedAccountInstructionDataSerializer(
-    context
-  ).serialize({});
+  const data = getThawDelegatedAccountInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

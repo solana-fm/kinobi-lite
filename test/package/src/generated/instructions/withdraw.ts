@@ -9,18 +9,24 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  array,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 
 // Accounts.
 export type WithdrawInstructionAccounts = {
-  candyMachine: PublicKey;
+  candyMachine: PublicKey | Pda;
   authority?: Signer;
 };
 
@@ -29,17 +35,24 @@ export type WithdrawInstructionData = { discriminator: Array<number> };
 
 export type WithdrawInstructionDataArgs = {};
 
+/** @deprecated Use `getWithdrawInstructionDataSerializer()` without any argument instead. */
 export function getWithdrawInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<WithdrawInstructionDataArgs, WithdrawInstructionData>;
+export function getWithdrawInstructionDataSerializer(): Serializer<
+  WithdrawInstructionDataArgs,
+  WithdrawInstructionData
+>;
+export function getWithdrawInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<WithdrawInstructionDataArgs, WithdrawInstructionData> {
-  const s = context.serializer;
   return mapSerializer<
     WithdrawInstructionDataArgs,
     any,
     WithdrawInstructionData
   >(
-    s.struct<WithdrawInstructionData>(
-      [['discriminator', s.array(s.u8(), { size: 8 })]],
+    struct<WithdrawInstructionData>(
+      [['discriminator', array(u8(), { size: 8 })]],
       { description: 'WithdrawInstructionData' }
     ),
     (value) => ({
@@ -51,47 +64,35 @@ export function getWithdrawInstructionDataSerializer(
 
 // Instruction.
 export function withdraw(
-  context: Pick<Context, 'serializer' | 'programs' | 'identity'>,
+  context: Pick<Context, 'programs' | 'identity'>,
   input: WithdrawInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplCandyMachineCore',
-      'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplCandyMachineCore',
+    'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    candyMachine: [input.candyMachine, true] as const,
+  };
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authority',
-    input.authority ?? context.identity
+    input.authority
+      ? ([input.authority, true] as const)
+      : ([context.identity, true] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
 
-  // Candy Machine.
-  keys.push({
-    pubkey: resolvedAccounts.candyMachine,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.candyMachine, true),
-  });
-
-  // Authority.
-  signers.push(resolvedAccounts.authority);
-  keys.push({
-    pubkey: resolvedAccounts.authority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.authority, true),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.candyMachine, false);
+  addAccountMeta(keys, signers, resolvedAccounts.authority, false);
 
   // Data.
-  const data = getWithdrawInstructionDataSerializer(context).serialize({});
+  const data = getWithdrawInstructionDataSerializer().serialize({});
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

@@ -11,13 +11,17 @@ import {
   Context,
   Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { PickPartial, addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { PickPartial, addAccountMeta, addObjectProperty } from '../shared';
 import {
   TaCreateArgs,
   TaCreateArgsArgs,
@@ -31,7 +35,7 @@ export type CreateRuleSetInstructionAccounts = {
   /** The PDA account where the RuleSet is stored */
   ruleSetPda: Pda;
   /** System program */
-  systemProgram?: PublicKey;
+  systemProgram?: PublicKey | Pda;
 };
 
 // Data.
@@ -46,20 +50,27 @@ export type CreateRuleSetInstructionDataArgs = {
   ruleSetBump: number;
 };
 
+/** @deprecated Use `getCreateRuleSetInstructionDataSerializer()` without any argument instead. */
 export function getCreateRuleSetInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<CreateRuleSetInstructionDataArgs, CreateRuleSetInstructionData>;
+export function getCreateRuleSetInstructionDataSerializer(): Serializer<
+  CreateRuleSetInstructionDataArgs,
+  CreateRuleSetInstructionData
+>;
+export function getCreateRuleSetInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<CreateRuleSetInstructionDataArgs, CreateRuleSetInstructionData> {
-  const s = context.serializer;
   return mapSerializer<
     CreateRuleSetInstructionDataArgs,
     any,
     CreateRuleSetInstructionData
   >(
-    s.struct<CreateRuleSetInstructionData>(
+    struct<CreateRuleSetInstructionData>(
       [
-        ['discriminator', s.u8()],
-        ['createArgs', getTaCreateArgsSerializer(context)],
-        ['ruleSetBump', s.u8()],
+        ['discriminator', u8()],
+        ['createArgs', getTaCreateArgsSerializer()],
+        ['ruleSetBump', u8()],
       ],
       { description: 'CreateRuleSetInstructionData' }
     ),
@@ -78,69 +89,57 @@ export type CreateRuleSetInstructionArgs = PickPartial<
 
 // Instruction.
 export function createRuleSet(
-  context: Pick<Context, 'serializer' | 'programs' | 'payer'>,
+  context: Pick<Context, 'programs' | 'payer'>,
   input: CreateRuleSetInstructionAccounts & CreateRuleSetInstructionArgs
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenAuthRules',
-      'auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenAuthRules',
+    'auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    ruleSetPda: [input.ruleSetPda, true] as const,
+  };
   const resolvingArgs = {};
-  addObjectProperty(resolvingAccounts, 'payer', input.payer ?? context.payer);
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
+    'payer',
+    input.payer
+      ? ([input.payer, true] as const)
+      : ([context.payer, true] as const)
+  );
+  addObjectProperty(
+    resolvedAccounts,
     'systemProgram',
-    input.systemProgram ?? {
-      ...context.programs.getPublicKey(
-        'splSystem',
-        '11111111111111111111111111111111'
-      ),
-      isWritable: false,
-    }
+    input.systemProgram
+      ? ([input.systemProgram, false] as const)
+      : ([
+          context.programs.getPublicKey(
+            'splSystem',
+            '11111111111111111111111111111111'
+          ),
+          false,
+        ] as const)
   );
   addObjectProperty(
     resolvingArgs,
     'ruleSetBump',
-    input.ruleSetBump ?? input.ruleSetPda.bump
+    input.ruleSetBump ?? input.ruleSetPda[1]
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
   const resolvedArgs = { ...input, ...resolvingArgs };
 
-  // Payer.
-  signers.push(resolvedAccounts.payer);
-  keys.push({
-    pubkey: resolvedAccounts.payer.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.payer, true),
-  });
-
-  // Rule Set Pda.
-  keys.push({
-    pubkey: resolvedAccounts.ruleSetPda,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.ruleSetPda, true),
-  });
-
-  // System Program.
-  keys.push({
-    pubkey: resolvedAccounts.systemProgram,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.systemProgram, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.payer, false);
+  addAccountMeta(keys, signers, resolvedAccounts.ruleSetPda, false);
+  addAccountMeta(keys, signers, resolvedAccounts.systemProgram, false);
 
   // Data.
   const data =
-    getCreateRuleSetInstructionDataSerializer(context).serialize(resolvedArgs);
+    getCreateRuleSetInstructionDataSerializer().serialize(resolvedArgs);
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

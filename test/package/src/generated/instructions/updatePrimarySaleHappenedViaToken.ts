@@ -9,23 +9,28 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { isWritable } from '../shared';
+import {
+  Serializer,
+  mapSerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta } from '../shared';
 
 // Accounts.
 export type UpdatePrimarySaleHappenedViaTokenInstructionAccounts = {
   /** Metadata key (pda of ['metadata', program id, mint id]) */
-  metadata: PublicKey;
+  metadata: PublicKey | Pda;
   /** Owner on the token account */
   owner: Signer;
   /** Account containing tokens from the metadata's mint */
-  token: PublicKey;
+  token: PublicKey | Pda;
 };
 
 // Data.
@@ -35,20 +40,30 @@ export type UpdatePrimarySaleHappenedViaTokenInstructionData = {
 
 export type UpdatePrimarySaleHappenedViaTokenInstructionDataArgs = {};
 
+/** @deprecated Use `getUpdatePrimarySaleHappenedViaTokenInstructionDataSerializer()` without any argument instead. */
 export function getUpdatePrimarySaleHappenedViaTokenInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<
+  UpdatePrimarySaleHappenedViaTokenInstructionDataArgs,
+  UpdatePrimarySaleHappenedViaTokenInstructionData
+>;
+export function getUpdatePrimarySaleHappenedViaTokenInstructionDataSerializer(): Serializer<
+  UpdatePrimarySaleHappenedViaTokenInstructionDataArgs,
+  UpdatePrimarySaleHappenedViaTokenInstructionData
+>;
+export function getUpdatePrimarySaleHappenedViaTokenInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<
   UpdatePrimarySaleHappenedViaTokenInstructionDataArgs,
   UpdatePrimarySaleHappenedViaTokenInstructionData
 > {
-  const s = context.serializer;
   return mapSerializer<
     UpdatePrimarySaleHappenedViaTokenInstructionDataArgs,
     any,
     UpdatePrimarySaleHappenedViaTokenInstructionData
   >(
-    s.struct<UpdatePrimarySaleHappenedViaTokenInstructionData>(
-      [['discriminator', s.u8()]],
+    struct<UpdatePrimarySaleHappenedViaTokenInstructionData>(
+      [['discriminator', u8()]],
       { description: 'UpdatePrimarySaleHappenedViaTokenInstructionData' }
     ),
     (value) => ({ ...value, discriminator: 4 })
@@ -60,51 +75,34 @@ export function getUpdatePrimarySaleHappenedViaTokenInstructionDataSerializer(
 
 // Instruction.
 export function updatePrimarySaleHappenedViaToken(
-  context: Pick<Context, 'serializer' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: UpdatePrimarySaleHappenedViaTokenInstructionAccounts
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplTokenMetadata',
-      'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplTokenMetadata',
+    'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
+  const resolvedAccounts = {
+    metadata: [input.metadata, true] as const,
+    owner: [input.owner, false] as const,
+    token: [input.token, false] as const,
+  };
 
-  // Metadata.
-  keys.push({
-    pubkey: resolvedAccounts.metadata,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.metadata, true),
-  });
-
-  // Owner.
-  signers.push(resolvedAccounts.owner);
-  keys.push({
-    pubkey: resolvedAccounts.owner.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.owner, false),
-  });
-
-  // Token.
-  keys.push({
-    pubkey: resolvedAccounts.token,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.token, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.metadata, false);
+  addAccountMeta(keys, signers, resolvedAccounts.owner, false);
+  addAccountMeta(keys, signers, resolvedAccounts.token, false);
 
   // Data.
-  const data = getUpdatePrimarySaleHappenedViaTokenInstructionDataSerializer(
-    context
-  ).serialize({});
+  const data =
+    getUpdatePrimarySaleHappenedViaTokenInstructionDataSerializer().serialize(
+      {}
+    );
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;

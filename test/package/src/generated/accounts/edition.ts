@@ -9,16 +9,23 @@
 import {
   Account,
   Context,
+  Pda,
   PublicKey,
   RpcAccount,
   RpcGetAccountOptions,
   RpcGetAccountsOptions,
-  Serializer,
   assertAccountExists,
   deserializeAccount,
   gpaBuilder,
-  mapSerializer,
+  publicKey as toPublicKey,
 } from '@metaplex-foundation/umi';
+import {
+  Serializer,
+  mapSerializer,
+  publicKey as publicKeySerializer,
+  struct,
+  u64,
+} from '@metaplex-foundation/umi/serializers';
 import { TmKey, TmKeyArgs, getTmKeySerializer } from '../types';
 
 export type Edition = Account<EditionAccountData>;
@@ -34,16 +41,23 @@ export type EditionAccountDataArgs = {
   edition: number | bigint;
 };
 
+/** @deprecated Use `getEditionAccountDataSerializer()` without any argument instead. */
 export function getEditionAccountDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<EditionAccountDataArgs, EditionAccountData>;
+export function getEditionAccountDataSerializer(): Serializer<
+  EditionAccountDataArgs,
+  EditionAccountData
+>;
+export function getEditionAccountDataSerializer(
+  _context: object = {}
 ): Serializer<EditionAccountDataArgs, EditionAccountData> {
-  const s = context.serializer;
   return mapSerializer<EditionAccountDataArgs, any, EditionAccountData>(
-    s.struct<EditionAccountData>(
+    struct<EditionAccountData>(
       [
-        ['key', getTmKeySerializer(context)],
-        ['parent', s.publicKey()],
-        ['edition', s.u64()],
+        ['key', getTmKeySerializer()],
+        ['parent', publicKeySerializer()],
+        ['edition', u64()],
       ],
       { description: 'EditionAccountData' }
     ),
@@ -51,64 +65,79 @@ export function getEditionAccountDataSerializer(
   ) as Serializer<EditionAccountDataArgs, EditionAccountData>;
 }
 
+/** @deprecated Use `deserializeEdition(rawAccount)` without any context instead. */
 export function deserializeEdition(
-  context: Pick<Context, 'serializer'>,
+  context: object,
   rawAccount: RpcAccount
+): Edition;
+export function deserializeEdition(rawAccount: RpcAccount): Edition;
+export function deserializeEdition(
+  context: RpcAccount | object,
+  rawAccount?: RpcAccount
 ): Edition {
   return deserializeAccount(
-    rawAccount,
-    getEditionAccountDataSerializer(context)
+    rawAccount ?? (context as RpcAccount),
+    getEditionAccountDataSerializer()
   );
 }
 
 export async function fetchEdition(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<Edition> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
   assertAccountExists(maybeAccount, 'Edition');
-  return deserializeEdition(context, maybeAccount);
+  return deserializeEdition(maybeAccount);
 }
 
 export async function safeFetchEdition(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKey: PublicKey,
+  context: Pick<Context, 'rpc'>,
+  publicKey: PublicKey | Pda,
   options?: RpcGetAccountOptions
 ): Promise<Edition | null> {
-  const maybeAccount = await context.rpc.getAccount(publicKey, options);
-  return maybeAccount.exists ? deserializeEdition(context, maybeAccount) : null;
+  const maybeAccount = await context.rpc.getAccount(
+    toPublicKey(publicKey, false),
+    options
+  );
+  return maybeAccount.exists ? deserializeEdition(maybeAccount) : null;
 }
 
 export async function fetchAllEdition(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<Edition[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts.map((maybeAccount) => {
     assertAccountExists(maybeAccount, 'Edition');
-    return deserializeEdition(context, maybeAccount);
+    return deserializeEdition(maybeAccount);
   });
 }
 
 export async function safeFetchAllEdition(
-  context: Pick<Context, 'rpc' | 'serializer'>,
-  publicKeys: PublicKey[],
+  context: Pick<Context, 'rpc'>,
+  publicKeys: Array<PublicKey | Pda>,
   options?: RpcGetAccountsOptions
 ): Promise<Edition[]> {
-  const maybeAccounts = await context.rpc.getAccounts(publicKeys, options);
+  const maybeAccounts = await context.rpc.getAccounts(
+    publicKeys.map((key) => toPublicKey(key, false)),
+    options
+  );
   return maybeAccounts
     .filter((maybeAccount) => maybeAccount.exists)
-    .map((maybeAccount) =>
-      deserializeEdition(context, maybeAccount as RpcAccount)
-    );
+    .map((maybeAccount) => deserializeEdition(maybeAccount as RpcAccount));
 }
 
 export function getEditionGpaBuilder(
-  context: Pick<Context, 'rpc' | 'serializer' | 'programs'>
+  context: Pick<Context, 'rpc' | 'programs'>
 ) {
-  const s = context.serializer;
   const programId = context.programs.getPublicKey(
     'mplTokenMetadata',
     'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
@@ -119,13 +148,11 @@ export function getEditionGpaBuilder(
       parent: PublicKey;
       edition: number | bigint;
     }>({
-      key: [0, getTmKeySerializer(context)],
-      parent: [1, s.publicKey()],
-      edition: [33, s.u64()],
+      key: [0, getTmKeySerializer()],
+      parent: [1, publicKeySerializer()],
+      edition: [33, u64()],
     })
-    .deserializeUsing<Edition>((account) =>
-      deserializeEdition(context, account)
-    )
+    .deserializeUsing<Edition>((account) => deserializeEdition(account))
     .whereField('key', TmKey.EditionV1);
 }
 

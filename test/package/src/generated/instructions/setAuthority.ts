@@ -9,18 +9,25 @@
 import {
   AccountMeta,
   Context,
+  Pda,
   PublicKey,
-  Serializer,
   Signer,
   TransactionBuilder,
-  mapSerializer,
   transactionBuilder,
 } from '@metaplex-foundation/umi';
-import { addObjectProperty, isWritable } from '../shared';
+import {
+  Serializer,
+  array,
+  mapSerializer,
+  publicKey as publicKeySerializer,
+  struct,
+  u8,
+} from '@metaplex-foundation/umi/serializers';
+import { addAccountMeta, addObjectProperty } from '../shared';
 
 // Accounts.
 export type SetAuthorityInstructionAccounts = {
-  candyMachine: PublicKey;
+  candyMachine: PublicKey | Pda;
   authority?: Signer;
 };
 
@@ -32,19 +39,26 @@ export type SetAuthorityInstructionData = {
 
 export type SetAuthorityInstructionDataArgs = { newAuthority: PublicKey };
 
+/** @deprecated Use `getSetAuthorityInstructionDataSerializer()` without any argument instead. */
 export function getSetAuthorityInstructionDataSerializer(
-  context: Pick<Context, 'serializer'>
+  _context: object
+): Serializer<SetAuthorityInstructionDataArgs, SetAuthorityInstructionData>;
+export function getSetAuthorityInstructionDataSerializer(): Serializer<
+  SetAuthorityInstructionDataArgs,
+  SetAuthorityInstructionData
+>;
+export function getSetAuthorityInstructionDataSerializer(
+  _context: object = {}
 ): Serializer<SetAuthorityInstructionDataArgs, SetAuthorityInstructionData> {
-  const s = context.serializer;
   return mapSerializer<
     SetAuthorityInstructionDataArgs,
     any,
     SetAuthorityInstructionData
   >(
-    s.struct<SetAuthorityInstructionData>(
+    struct<SetAuthorityInstructionData>(
       [
-        ['discriminator', s.array(s.u8(), { size: 8 })],
-        ['newAuthority', s.publicKey()],
+        ['discriminator', array(u8(), { size: 8 })],
+        ['newAuthority', publicKeySerializer()],
       ],
       { description: 'SetAuthorityInstructionData' }
     ),
@@ -60,50 +74,38 @@ export type SetAuthorityInstructionArgs = SetAuthorityInstructionDataArgs;
 
 // Instruction.
 export function setAuthority(
-  context: Pick<Context, 'serializer' | 'programs' | 'identity'>,
+  context: Pick<Context, 'programs' | 'identity'>,
   input: SetAuthorityInstructionAccounts & SetAuthorityInstructionArgs
 ): TransactionBuilder {
   const signers: Signer[] = [];
   const keys: AccountMeta[] = [];
 
   // Program ID.
-  const programId = {
-    ...context.programs.getPublicKey(
-      'mplCandyMachineCore',
-      'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
-    ),
-    isWritable: false,
-  };
+  const programId = context.programs.getPublicKey(
+    'mplCandyMachineCore',
+    'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR'
+  );
 
   // Resolved inputs.
-  const resolvingAccounts = {};
+  const resolvedAccounts = {
+    candyMachine: [input.candyMachine, true] as const,
+  };
   const resolvingArgs = {};
   addObjectProperty(
-    resolvingAccounts,
+    resolvedAccounts,
     'authority',
-    input.authority ?? context.identity
+    input.authority
+      ? ([input.authority, false] as const)
+      : ([context.identity, false] as const)
   );
-  const resolvedAccounts = { ...input, ...resolvingAccounts };
   const resolvedArgs = { ...input, ...resolvingArgs };
 
-  // Candy Machine.
-  keys.push({
-    pubkey: resolvedAccounts.candyMachine,
-    isSigner: false,
-    isWritable: isWritable(resolvedAccounts.candyMachine, true),
-  });
-
-  // Authority.
-  signers.push(resolvedAccounts.authority);
-  keys.push({
-    pubkey: resolvedAccounts.authority.publicKey,
-    isSigner: true,
-    isWritable: isWritable(resolvedAccounts.authority, false),
-  });
+  addAccountMeta(keys, signers, resolvedAccounts.candyMachine, false);
+  addAccountMeta(keys, signers, resolvedAccounts.authority, false);
 
   // Data.
   const data =
-    getSetAuthorityInstructionDataSerializer(context).serialize(resolvedArgs);
+    getSetAuthorityInstructionDataSerializer().serialize(resolvedArgs);
 
   // Bytes Created On Chain.
   const bytesCreatedOnChain = 0;
