@@ -1,6 +1,6 @@
 {
   "name": "@solanafm/kinobi-lite",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "A lite client of Kinobi by Metaplex Foundations that's suitable for web deployment and omits the renderers",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
