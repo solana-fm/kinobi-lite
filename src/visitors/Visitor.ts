@@ -110,7 +110,7 @@ export function visit<T>(node: nodes.Node, visitor: Visitor<T>): T {
     case 'stringTypeNode':
       return visitor.visitStringType(node);
     default:
-      const nodeAsNever: never = node;
+      const nodeAsNever = node;
       throw new KinobiError(`Unrecognized node [${(nodeAsNever as any).kind}]`);
   }
 }

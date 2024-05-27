@@ -3,6 +3,7 @@ import { PartialExcept, mainCase } from '../shared';
 import { AccountNode, accountNodeFromIdl } from './AccountNode';
 import { DefinedTypeNode, definedTypeNodeFromIdl } from './DefinedTypeNode';
 import { ErrorNode, errorNodeFromIdl } from './ErrorNode';
+import { EventNode, eventNodeFromIdl } from './EventNode';
 import { InstructionNode, instructionNodeFromIdl } from './InstructionNode';
 import type { Node } from './Node';
 
@@ -17,6 +18,7 @@ export type ProgramNode = {
   readonly prefix: string;
   readonly publicKey: string;
   readonly version: string;
+  readonly events?: EventNode[];
   readonly origin?: 'shank' | 'anchor';
   readonly internal: boolean;
 };
@@ -46,6 +48,7 @@ export function programNode(input: ProgramNodeInput): ProgramNode {
     prefix: mainCase(input.prefix ?? ''),
     publicKey: input.publicKey,
     version: input.version,
+    events: input.events,
     origin: input.origin,
     internal: input.internal ?? false,
   } as ProgramNode;
@@ -62,9 +65,11 @@ export function programNodeFromIdl(idl: Partial<Idl>): ProgramNode {
         })
       : instructionNodeFromIdl(ix)
   );
+  const events = (idl.events ?? []).map((event) => eventNodeFromIdl(event));
   return programNode({
     accounts,
     instructions,
+    events,
     definedTypes: (idl.types ?? []).map(definedTypeNodeFromIdl),
     errors: (idl.errors ?? []).map(errorNodeFromIdl),
     name: idl.name ?? '',

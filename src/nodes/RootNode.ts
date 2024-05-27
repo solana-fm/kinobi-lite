@@ -2,6 +2,7 @@ import type { Idl } from '../idl';
 import type { AccountNode } from './AccountNode';
 import type { DefinedTypeNode } from './DefinedTypeNode';
 import type { ErrorNode } from './ErrorNode';
+import { EventNode } from './EventNode';
 import type { InstructionNode } from './InstructionNode';
 import type { Node } from './Node';
 import { ProgramNode, programNodeFromIdl } from './ProgramNode';
@@ -20,8 +21,9 @@ export function rootNode(programs: ProgramNode[]): RootNode {
 
 export function rootNodeFromIdls(idls: IdlInputs): RootNode {
   const idlArray = Array.isArray(idls) ? idls : [idls];
-  const programs = idlArray
-    .map((idl) => programNodeFromIdl(idl as Partial<Idl>));
+  const programs = idlArray.map((idl) =>
+    programNodeFromIdl(idl as Partial<Idl>)
+  );
   return rootNode(programs);
 }
 
@@ -39,6 +41,10 @@ export function getAllInstructions(node: RootNode): InstructionNode[] {
 
 export function getAllErrors(node: RootNode): ErrorNode[] {
   return node.programs.flatMap((program) => program.errors);
+}
+
+export function getAllEvents(node: RootNode): EventNode[] {
+  return node.programs.flatMap((program) => program.events ?? []);
 }
 
 export function isRootNode(node: Node | null): node is RootNode {
