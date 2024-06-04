@@ -1,5 +1,4 @@
 /* eslint-disable no-console */
-import chalk from 'chalk';
 import { getLevelIndex, LogLevel } from '../../shared/logs';
 import { BaseDelegateVisitor } from '../BaseDelegateVisitor';
 import { ValidatorBag } from '../ValidatorBag';
@@ -33,8 +32,8 @@ export class ThrowValidatorItemsVisitor extends BaseDelegateVisitor<
         .map((level) => `${level}s: ${levelHistogram[level as LogLevel]}`)
         .join(', ');
       console.log(
-        `${chalk.red(`Failed to validate the nodes.`)} ` +
-          `${chalk.red.bold(`Found ${histogramString}.`)}\n`
+        `${`Failed to validate the nodes.`} ` +
+          `${`Found ${histogramString}.`}\n`
       );
       process.exit(1);
     }

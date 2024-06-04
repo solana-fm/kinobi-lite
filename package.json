@@ -56,8 +56,7 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "@noble/hashes": "^1.1.5",
-    "chalk": "^4.0.0"
+    "@noble/hashes": "^1.1.5"
   },
-  "packageManager": "pnpm@8.3.0"
+  "packageManager": "pnpm@9.0.5+sha256.61bd66913b52012107ec25a6ee4d6a161021ab99e04f6acee3aa50d0e34b4af9"
 }
